@@ -343,11 +343,31 @@ def type_rank(type_id):
         return f"{len(config.ITEM_TYPE_ORDER):02d}{type_id.lower()}"
 
 
+_NUM_CHUNK_RE = re.compile(r"(\d+)")
+
+
+def natural_key(text):
+    """« Plate 1 x 3 » avant « Plate 1 x 12 » : les nombres se comparent comme des NOMBRES.
+
+    Le tri de la Phase A décide de quels lots se retrouvent côte à côte, donc dans le même
+    Sac, et le trieur longe ses bacs dans cet ordre-là. En texte brut, « plate 1 x 12 »
+    passe avant « plate 1 x 3 » — le '1' de 12 bat le '3' au troisième caractère — ce qui
+    envoyait la 1x12 au Sac 06 pendant que les 1x3 et 1x5 allaient au Sac 07. Un moule
+    rangé à l'envers de sa taille, donc un aller-retour dans les bacs.
+
+    On découpe sur les suites de chiffres et on compare les nombres en nombres. Le découpage
+    alterne toujours texte/chiffres (`re.split` sur un groupe capturant rend d'abord un
+    morceau non numérique, même vide), donc deux clés ne confrontent jamais un int à une
+    str au même rang. Sans chiffres, ça se réduit à la comparaison de texte d'avant."""
+    return tuple(int(c) if c.isdigit() else c
+                 for c in _NUM_CHUNK_RE.split((text or "").lower()))
+
+
 def item_sort_tuple(item):
     """The Phase-A sort key for one item, per config.SORT_KEYS."""
     vals = {"type": type_rank(item["item_type"]), "category": item["category_name"],
             "name": item["item_name"], "color": item["color_name"]}
-    return tuple(vals[s].lower() for s in config.SORT_KEYS)
+    return tuple(natural_key(vals[s]) for s in config.SORT_KEYS)
 
 
 class _Bins:

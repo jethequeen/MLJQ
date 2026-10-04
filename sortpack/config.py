@@ -262,6 +262,11 @@ BACKUP_ROOT = os.path.join(CATALOGUAGE_ROOT, "backups")
 # bag). Sort order within the whole inventory before bagging:
 SAC_TARGET_GRAMS = 650.0
 SORT_KEYS = ("type", "category", "name", "color")  # Type -> Category -> Description -> Color
+# Chaque composante se compare en ordre NATUREL (plan.natural_key) : les suites de chiffres
+# valent des nombres, donc « Plate 1 x 3 » passe avant « Plate 1 x 12 ». En texte brut c'est
+# l'inverse — le '1' de 12 bat le '3' au troisieme caractere — et un moule se retrouvait
+# range a l'envers de sa taille : la 1x12 au Sac 06 pendant que les 1x3 et 1x5 allaient au
+# Sac 07, donc un aller-retour dans les bacs que le trieur longe dans cet ordre-la.
 # Item types are packed in this order (first listed = lowest Sac numbers). Minifigs
 # come before Parts, so minifigs land in Sac 1; the rest follow. Any ItemTypeID not
 # listed here sorts after these, by its own id. Values are BrickStore ItemTypeID
