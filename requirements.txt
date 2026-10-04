@@ -1,0 +1,10 @@
+# MLJQ — Sort & Pack Helper : dépendances tierces (hors bibliothèque standard).
+# tkinter et sqlite3 sont inclus avec Python (installeur python.org) — rien à installer.
+# requests + beautifulsoup4 ne servent qu'aux scrapers (Rapport d'achat, Inventaire CFB, ventes) ;
+# le tri/emballage de base tourne même sans eux.
+#   pip install -r requirements.txt
+requests>=2.28
+beautifulsoup4>=4.11
+# Pillow : les vignettes Brickset dans la liste des sets (GUI). Sans lui la liste
+# s'affiche normalement, simplement sans image — l'échec est silencieux par design.
+Pillow>=9.0

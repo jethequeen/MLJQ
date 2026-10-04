@@ -1,0 +1,37 @@
+# --- Données et secrets : JAMAIS versionnés -----------------------------------
+# La base porte les achats, les ventes, l'inventaire… et les COOKIES de session CFB
+# (meta cfb_cookie_CA / cfb_cookie_US). Elle n'a rien à faire dans un dépôt, même privé.
+history/*.sqlite
+history/*.sqlite-journal
+history/*.sqlite-wal
+history/*.sqlite-shm
+# Dumps HTML des portails CFB : pages authentifiées, donc potentiellement porteuses de
+# jetons. Ce sont des artefacts de débogage, régénérés à chaque passe.
+_cfb_debug/
+# Journaux et rapports : sortie de travail, pas du code.
+*.log
+reports/
+# Permissions locales de Claude Code, propres à cette machine.
+.claude/settings.local.json
+
+# --- Fichiers de travail BrickStore -------------------------------------------
+# Les vraies listes vivent dans BSX\CFB (hors du dépôt). Ce qui traîne ici est généré.
+*.bsx
+# …sauf les gabarits d'état de colonnes, qui sont du code (sortpack/*.xml est suivi).
+
+# --- Python --------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+*.egg-info/
+
+# --- Windows / Google Drive ------------------------------------------------------
+desktop.ini
+Thumbs.db
+*.tmp
+~$*
+
+# Fichier d-état résiduel à la racine (le vrai vit dans BSX\CFB).
+set_status.json

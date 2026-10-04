@@ -1,0 +1,4 @@
+# Aucune conversion de fins de ligne. Le dossier est sur Google Drive et deux machines
+# travaillent dessus en direct : un checkout qui réécrirait les CRLF toucherait des
+# fichiers que le GUI de l'autre poste est peut-être en train de lire.
+* -text

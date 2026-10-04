@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sort & Pack">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1f2328; --mute:#6b7280; --line:#e5e7eb;
+    --gray:#6b7280; --blue:#2563eb; --orange:#d97706; --green:#16a34a; --accent:#0f376e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0d1117; --card:#161b22; --ink:#e6edf3; --mute:#9aa4b2; --line:#232a33; --accent:#1c56a8; }
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+        background:var(--bg); color:var(--ink);
+        padding-bottom:calc(124px + env(safe-area-inset-bottom)); }
+  /* No title bar: the tab bar already says where you are, and a phone screen held over a
+     sorting table is worth more than a banner. Refresh stays as a discreet corner button. */
+  #reload{ position:fixed; z-index:8; top:calc(6px + env(safe-area-inset-top)); right:10px;
+           width:34px; height:34px; padding:0; border:0; border-radius:999px;
+           background:var(--card); color:var(--mute); border:1px solid var(--line);
+           font-size:16px; line-height:1; opacity:.85; }
+  .wrap{ padding:calc(12px + env(safe-area-inset-top)) 14px 0; }
+  .asof{ color:var(--mute); font-size:12px; margin:0 40px 10px 2px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px;
+         padding:13px 14px; margin-bottom:11px; }
+  .row1{ display:flex; align-items:center; gap:10px; }
+  .thumb{ width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--line); flex:0 0 auto; }
+  .name{ font-size:15px; font-weight:600; flex:1; line-height:1.25; }
+  .row1.tap{ cursor:pointer; }
+  .caret{ color:var(--mute); font-size:13px; width:12px; text-align:center; flex:0 0 auto; }
+  .pill{ font-size:12px; font-weight:700; padding:4px 9px; border-radius:999px; white-space:nowrap; color:#fff; }
+  .pill.gray{ background:var(--gray); } .pill.blue{ background:var(--blue); }
+  .pill.orange{ background:var(--orange); } .pill.green{ background:var(--green); }
+  .pill.purple{ background:#8250df; }   /* emballé, en attente du transporteur */
+  .pill.amber{ background:#9a6700; }    /* envoi pas encore fermé : on ne trie pas */
+  .pill.slate{ background:#57606a; }    /* acheté, encore chez le transporteur */
+  .hrow{ display:flex; align-items:center; gap:11px; padding:11px 13px; }
+  .hrow img{ width:44px; height:44px; object-fit:contain; flex:none; }
+  .hrow .hname{ flex:1; min-width:0; font-weight:600; font-size:14px; }
+  .hrow .hname span{ display:block; font-weight:500; font-size:11.5px; color:var(--mute);
+                     margin-top:2px; }
+  .hrow .hqty{ font-size:12.5px; color:var(--mute); white-space:nowrap; text-align:right; }
+  .bags{ display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; }
+  .bag{ min-width:46px; height:46px; padding:0 6px; border-radius:11px; border:2px solid var(--line);
+        background:transparent; color:var(--ink); font-size:15px; font-weight:600;
+        display:flex; align-items:center; justify-content:center; }
+  .bag.on{ background:var(--green); border-color:var(--green); color:#fff; }
+  .hint{ color:var(--mute); font-size:12px; margin-top:10px; }
+  .acts{ display:flex; gap:9px; margin-top:12px; }
+  .act{ flex:1; font-size:13px; font-weight:600; padding:10px; border-radius:10px;
+        border:1.5px solid var(--accent); background:transparent; color:var(--accent); }
+  .act.solid{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .act.off{ opacity:.38; pointer-events:none; }
+  .pill{ cursor:pointer; }
+  .gate{ color:var(--mute); font-size:11px; margin-top:8px; }
+  .cmd{ font-size:12px; margin-top:9px; font-weight:600; }
+  .cmd.pending{ color:var(--orange); } .cmd.running{ color:var(--blue); }
+  .cmd.done{ color:var(--green); } .cmd.error{ color:#dc2626; }
+  .fab{ position:fixed; right:16px; bottom:calc(76px + env(safe-area-inset-bottom)); z-index:6;
+        background:var(--accent); color:#fff; border:0; border-radius:999px; font-size:16px;
+        font-weight:650; padding:14px 20px; box-shadow:0 6px 18px rgba(0,0,0,.28); }
+  .modal{ position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.45); display:flex; align-items:flex-end; }
+  .modal.hidden{ display:none; }
+  .sheet{ background:var(--card); width:100%; border-radius:16px 16px 0 0;
+          padding:18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .sheet h2{ margin:0 0 12px; font-size:17px; }
+  .fld{ margin-bottom:11px; } .fld label{ display:block; font-size:12px; color:var(--mute); margin-bottom:4px; }
+  .fld input{ width:100%; font-size:16px; padding:11px 12px; border:1px solid var(--line);
+              border-radius:10px; background:var(--bg); color:var(--ink); }
+  .btns{ display:flex; gap:10px; margin-top:6px; }
+  .btns button{ flex:1; font-size:15px; font-weight:650; padding:13px; border-radius:11px; border:0; }
+  .btns .go{ background:var(--accent); color:#fff; } .btns .cancel{ background:var(--line); color:var(--ink); }
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:140px; z-index:30;
+          background:#111827; color:#fff; padding:10px 16px; border-radius:10px; font-size:13px;
+          max-width:88%; text-align:center; opacity:0; transition:opacity .2s; }
+  .toast.show{ opacity:1; }
+  .center{ text-align:center; color:var(--mute); padding:40px 0; }
+
+  /* ---- tab bar ---- */
+  .tabs{ position:fixed; left:0; right:0; bottom:0; z-index:10; display:flex;
+         background:var(--card); border-top:1px solid var(--line);
+         padding-bottom:env(safe-area-inset-bottom); }
+  .tabs button{ flex:1; background:none; border:0; color:var(--mute); font-size:11px;
+                font-weight:600; padding:9px 4px 8px; display:flex; flex-direction:column;
+                align-items:center; gap:3px; }
+  .tabs button .ic{ font-size:19px; line-height:1; }
+  .tabs button.on{ color:var(--accent); }
+  .view{ display:none; } .view.on{ display:block; }
+
+  /* ---- Finances ---- */
+  .big{ font-size:34px; font-weight:750; letter-spacing:-.5px; margin:2px 0; }
+  .big.neg{ color:#dc2626; } .big.pos{ color:var(--green); }
+  .lbl{ color:var(--mute); font-size:11.5px; text-transform:uppercase;
+        letter-spacing:.4px; font-weight:700; }
+  .sub{ color:var(--mute); font-size:13px; line-height:1.5; }
+  .kv{ display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:3px 0; }
+  .kv b{ font-weight:650; }
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+  .chip{ font-size:11.5px; font-weight:650; padding:5px 9px; border-radius:999px;
+         background:var(--line); color:var(--ink); }
+  .chip.ok{ background:rgba(22,163,74,.16); color:var(--green); }
+  .chip.bad{ background:rgba(220,38,38,.15); color:#dc2626; }
+  .chip.warn{ background:rgba(217,119,6,.17); color:var(--orange); }
+  .jobs{ display:flex; flex-direction:column; gap:9px; }
+  .job{ display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+        border:1px solid var(--line); border-radius:12px; padding:11px 12px;
+        background:transparent; color:var(--ink); }
+  .job .ji{ font-size:19px; width:24px; text-align:center; flex:0 0 auto; }
+  .job .jt{ flex:1; }
+  .job .jt b{ display:block; font-size:14px; font-weight:650; }
+  .job .jt span{ display:block; font-size:11.5px; color:var(--mute); margin-top:2px; }
+  .job.busy{ opacity:.6; pointer-events:none; }
+
+  /* ---- Achats ---- */
+  .rank{ width:27px; height:27px; border-radius:8px; background:var(--accent); color:#fff;
+         font-size:13px; font-weight:700; flex:0 0 auto;
+         display:flex; align-items:center; justify-content:center; }
+  .rank.alt{ background:var(--line); color:var(--mute); }
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px; }
+  .cell{ background:var(--bg); border-radius:9px; padding:7px 8px; }
+  .cell.wide{ grid-column:1 / -1; }   /* la 7e cellule prend la rangée, pas un orphelin */
+  .hint2{ display:block; margin-top:5px; font-size:11.5px; line-height:1.35; color:var(--mute); }
+  .kv.sub2{ font-size:11.5px; color:var(--mute); }
+  .done{ margin-top:9px; padding:8px 10px; border-radius:9px; font-size:12px;
+         line-height:1.4; background:rgba(22,163,74,.10); color:var(--green);
+         font-weight:600; }
+  .cell i{ display:block; font-style:normal; font-size:10.5px; color:var(--mute);
+           font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  .cell b{ font-size:14px; font-weight:650; }
+  .more{ width:100%; font-size:13px; font-weight:650; padding:11px; border-radius:11px;
+         border:1px dashed var(--line); background:transparent; color:var(--accent);
+         margin-bottom:11px; }
+  a.act{ text-decoration:none; text-align:center; line-height:1.4; }
+  /* the discount, under the price: old price struck + the markdown */
+  .cell .sm{ display:block; font-size:10.5px; margin-top:2px; color:var(--mute); }
+  .cell .sm s{ margin-right:5px; }
+  .cell .sm em{ font-style:normal; font-weight:750; color:var(--green); }
+  .disc{ font-size:10.5px; font-weight:750; padding:2px 6px; border-radius:999px;
+         background:rgba(22,163,74,.16); color:var(--green); white-space:nowrap; }
+  /* filter / sort bar on the Achats tab */
+  .fbar{ background:var(--card); border:1px solid var(--line); border-radius:14px;
+         padding:11px 12px; margin-bottom:11px; }
+  .fbar input{ width:100%; font-size:16px; padding:10px 12px; border:1px solid var(--line);
+               border-radius:10px; background:var(--bg); color:var(--ink);
+               -webkit-appearance:none; }
+  .frow{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+  .fchip{ font-size:12px; font-weight:650; padding:7px 12px; border-radius:999px;
+          border:1.5px solid var(--line); background:transparent; color:var(--mute); }
+  .fchip.on{ border-color:var(--accent); background:var(--accent); color:#fff; }
+  .fsel{ flex:1; min-width:150px; font-size:13px; font-weight:600; padding:9px 10px;
+         border-radius:10px; border:1.5px solid var(--line); background:var(--bg);
+         color:var(--ink); }
+  .fcount{ display:flex; align-items:center; gap:10px; color:var(--mute); font-size:12px;
+           margin:0 2px 10px; }
+  .fcount button{ font-size:12px; font-weight:650; padding:5px 10px; border-radius:999px;
+                  border:1.5px solid var(--line); background:transparent; color:var(--accent); }
+
+  /* ---- bag chip + its chevron, and the sorting panel ---- */
+  .bagwrap{ display:flex; }
+  .bagwrap .bag{ border-radius:11px 0 0 11px; border-right-width:1px; }
+  .bagx{ width:24px; height:46px; padding:0; border:2px solid var(--line); border-left:0;
+         border-radius:0 11px 11px 0; background:transparent; color:var(--mute);
+         font-size:12px; line-height:1; }
+  .bagx.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .panel{ margin-top:12px; border-top:1px solid var(--line); padding-top:12px; }
+  .panel .ph{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .panel .ph b{ font-size:14px; flex:1; }
+  .panel input{ width:100%; font-size:16px; padding:10px 12px; border:1px solid var(--line);
+                border-radius:10px; background:var(--bg); color:var(--ink); margin-bottom:10px; }
+  .rest{ border:1px solid var(--line); border-radius:11px; padding:10px 11px; margin-bottom:8px; }
+  .rest .rl{ display:flex; align-items:center; gap:9px; }
+  .rest .rn{ flex:1; font-size:13px; line-height:1.35; }
+  .rest .rn i{ font-style:normal; color:var(--mute); }
+  .rest .rq{ font-size:15px; font-weight:700; white-space:nowrap; }
+  .mini{ font-size:12px; font-weight:650; padding:7px 11px; border-radius:9px;
+         border:1.5px solid var(--accent); background:transparent; color:var(--accent); }
+  .mini.go{ background:var(--green); border-color:var(--green); color:#fff; }
+  .verdict{ margin-top:9px; padding:9px 10px; border-radius:9px; background:var(--bg);
+            font-size:13px; line-height:1.45; }
+  .verdict b{ font-size:15px; }
+  .verdict.wait{ border-left:3px solid var(--orange); }
+  .verdict.go{ border-left:3px solid var(--green); }
+  .vrow{ display:flex; gap:8px; margin-top:9px; }
+  .none{ color:var(--mute); font-size:12.5px; padding:6px 2px 10px; line-height:1.5; }
+  /* search hits: one tight line each, the verdict only when you tap one */
+  .prow{ display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+         border:1px solid var(--line); border-radius:9px; padding:7px 9px;
+         margin-bottom:5px; background:transparent; color:var(--ink); }
+  .prow.on{ border-color:var(--accent); }
+  .prow .pd{ width:13px; flex:0 0 auto; color:var(--mute); font-size:11px; }
+  .prow .pn{ flex:1; font-size:12.5px; line-height:1.3; }
+  .prow .pn i{ font-style:normal; color:var(--mute); }
+  .prow .pq{ font-size:12.5px; font-weight:700; white-space:nowrap; }
+  .pimg{ width:34px; height:34px; object-fit:contain; flex:0 0 auto; }
+  .pimg.sm{ width:26px; height:26px; }
+  .qin{ width:74px; font-size:15px; font-weight:650; text-align:center;
+        padding:8px 6px; border:1.5px solid var(--line); border-radius:9px;
+        background:var(--bg); color:var(--ink); margin:0; }
+</style>
+</head>
+<body>
+<button id="reload" title="Actualiser">&#8635;</button>
+
+<div class="wrap">
+  <section class="view on" id="view-tri">
+    <p class="asof" id="asof"></p>
+    <div id="app"><div class="center">Chargement&#8230;</div></div>
+  </section>
+
+  <section class="view" id="view-achats">
+    <div id="buy"><div class="center">Chargement&#8230;</div></div>
+  </section>
+
+  <section class="view" id="view-fin">
+    <div id="fin"><div class="center">Chargement&#8230;</div></div>
+  </section>
+
+  <section class="view" id="view-hist">
+    <div id="hist"><div class="center">Chargement&#8230;</div></div>
+  </section>
+</div>
+
+<button class="fab" id="fab">&#65291; Achat</button>
+
+<nav class="tabs">
+  <button data-tab="tri" class="on"><span class="ic">&#129529;</span>Tri</button>
+  <button data-tab="achats"><span class="ic">&#128722;</span>Achats</button>
+  <button data-tab="fin"><span class="ic">&#128176;</span>Finances</button>
+  <button data-tab="hist"><span class="ic">&#128230;</span>Historique</button>
+</nav>
+
+<div class="modal hidden" id="modal">
+  <div class="sheet">
+    <h2>J'ai acheté un set</h2>
+    <div class="fld"><label>Numéro de set</label><input id="p_num" inputmode="numeric" placeholder="ex. 76342"></div>
+    <div class="fld"><label>Vendeur</label><input id="p_vendor" value="Amazon"></div>
+    <div class="fld"><label>Quantité</label><input id="p_qty" inputmode="numeric" value="10"></div>
+    <div class="fld"><label>Prix TOTAL payé (taxes incl.)</label><input id="p_price" inputmode="decimal" placeholder="ex. 249.90"></div>
+    <div class="fld"><label>Date</label><input id="p_date" type="date"></div>
+    <div class="fld"><label>Batch</label><input id="p_batch" placeholder="ex. 1">
+      <span class="hint2" id="p_batch_note"></span></div>
+    <div class="btns"><button class="cancel" id="p_cancel">Annuler</button><button class="go" id="p_go">Enregistrer</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="phasemodal">
+  <div class="sheet">
+    <h2>Changer la phase</h2>
+    <div class="btns" style="flex-direction:column">
+      <button class="go" data-phase="ouverture">Remettre avant le tri</button>
+      <button class="go" data-phase="trier">Trier (en cours)</button>
+      <button class="go" data-phase="trie">Trié (tout cocher)</button>
+      <button class="cancel" id="phase_cancel">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var SETS = [];
+  var saveTimers = {};
+  // Set cards start collapsed: on a phone the list is for FINDING the set you are on,
+  // and nine bag chips per set pushed everything else off screen. Tap a card to open it.
+  var OPEN = {};
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2600); }
+  function imgUrl(num){ if(!num) return ''; var sid=(String(num).indexOf('-')>=0)?num:(num+'-1'); return 'https://images.brickset.com/sets/small/'+sid+'.jpg'; }
+
+  // ── formatting ──────────────────────────────────────────────────────────────
+  function num(v, dec){
+    if(v===null || v===undefined || v==='') return null;
+    var n = Number(v); return isFinite(n) ? n : null;
+  }
+  function money(v, dec){
+    var n = num(v); if(n===null) return '—';
+    dec = dec===undefined ? 0 : dec;
+    return n.toLocaleString('fr-CA',{minimumFractionDigits:dec,maximumFractionDigits:dec})+' $';
+  }
+  function pct(v){ var n=num(v); return n===null ? '—' : Math.round(n)+' %'; }
+  function ago(iso){
+    if(!iso) return 'jamais';
+    var d = new Date(String(iso).replace(' ','T'));
+    if(isNaN(d)) return String(iso);
+    var mn = Math.round((Date.now()-d.getTime())/60000);
+    if(mn < 2) return 'à l\'instant';
+    if(mn < 60) return 'il y a '+mn+' min';
+    if(mn < 1440) return 'il y a '+Math.round(mn/60)+' h';
+    var j = Math.round(mn/1440);
+    return j===1 ? 'hier' : 'il y a '+j+' j';
+  }
+
+  // ── tabs ────────────────────────────────────────────────────────────────────
+  var TAB = 'tri';
+  var TITLES = {tri:'Sort & Pack', achats:'Achats', fin:'Finances', hist:'Historique'};
+  function showTab(t){
+    TAB = t;
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
+    document.getElementById('view-'+t).classList.add('on');
+    document.querySelectorAll('.tabs button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-tab')===t);
+    });
+    document.title = TITLES[t];
+    syncFab();
+    window.scrollTo(0,0);
+    if(t!=='tri' && !DASH) loadDash();
+    if(t==='hist') renderHist();
+  }
+
+  // ── Achats + Finances (dashboard.json, written by the PC) ───────────────────
+  var DASH = null;       // the snapshot
+  var JOBQ = {};         // action -> {status,result} (optimistic until the PC replies)
+  var showOthers = false;
+  var pollTimer = null;
+  // Achats tab: free-text search, store filter and sort key. Untouched (q='' / src='' /
+  // sort='rank') the tab keeps its "Lot du mois + voir les autres" shape; touch any of the
+  // three and it flattens into one ranked, filtered list over every candidate.
+  var BUYF = {q:'', src:'', sort:'rank'};
+  var BUY_SORTS = [
+    ['rank',     'Classement (défaut)'],
+    ['pct',      'Rendement %/an'],
+    ['roi',      'ROI'],
+    ['discount', 'Rabais'],
+    ['price_up', 'Prix — le moins cher'],
+    ['price_dn', 'Prix — le plus cher'],
+    ['months',   'Délai de revente'],
+    ['profit',   'Profit $/an'],
+    ['name',     'Nom (A-Z)']
+  ];
+  function buyFiltered(){ return !!(BUYF.q || BUYF.src || BUYF.sort !== 'rank'); }
+
+  var JOBS = [
+    {a:'sync_purchases', ic:'🔄', t:'Synchroniser les achats',
+     d:'Journal → base + dossiers CFB manquants',
+     q:'Relire le Journal et mettre la base à jour ?'},
+    {a:'buy_report', ic:'📊', t:'Rapport d\'achat',
+     d:'Amazon + Costco → nouveau lot du mois, publié au sheet',
+     q:'Rafraîchir les rabais, recalculer le lot du mois et le publier (courriel si le lot change) ?'},
+    {a:'cfb_inventory', ic:'📦', t:'Inventaire CFB',
+     d:'Valeur des portails CA + US → feuilles du mois',
+     q:'Lire la valeur d\'inventaire CFB et l\'inscrire au mois courant ?'},
+    {a:'end_of_month', ic:'🗓️', t:'Fin de mois',
+     d:'Recalcule le budget investissable de chaque mois',
+     q:'Relire la feuille financière et recalculer les budgets mensuels ?'},
+    {a:'check_cookies', ic:'🍪', t:'Vérifier les cookies',
+     d:'Re-teste les sessions CA / US (le collage reste sur le PC)',
+     q:'Revérifier les deux sessions CFB ?'}
+  ];
+
+  function jobState(a){
+    var q = JOBQ[a];
+    if(q && (q.status==='pending' || q.status==='running')) return q;
+    return q || null;
+  }
+  function anyJobWaiting(){
+    return JOBS.some(function(j){
+      var q = JOBQ[j.a];
+      return q && (q.status==='pending' || q.status==='running');
+    });
+  }
+  function schedulePoll(){
+    clearTimeout(pollTimer);
+    if(anyJobWaiting()) pollTimer = setTimeout(loadDash, 15000);
+  }
+
+  function loadDash(){
+    google.script.run.withSuccessHandler(function(d){
+      DASH = d || {ok:false, error:'réponse vide'};
+      JOBQ = (DASH.jobs_queue && typeof DASH.jobs_queue === 'object') ? DASH.jobs_queue : {};
+      renderBuy(); renderFin(); renderHist(); schedulePoll();
+    }).withFailureHandler(function(e){
+      DASH = {ok:false, error:e.message};
+      renderBuy(); renderFin();
+    }).getDashboard();
+  }
+
+  function buyCard(r, alt){
+    var d = num(r.discount);
+    var h = '<div class="card">';
+    h += '<div class="row1">';
+    h += '<span class="rank'+(alt?' alt':'')+'">'+(r.rank||'·')+'</span>';
+    h += '<img class="thumb" src="'+imgUrl(r.number)+'" onerror="this.style.visibility=&quot;hidden&quot;">';
+    h += '<div class="name">'+esc(r.name)+'<span class="sub" style="display:block">'
+       + esc(r.number) + (r.year ? ' · '+esc(r.year) : '')
+       + ' · ' + esc((r.source||'').charAt(0).toUpperCase()+(r.source||'').slice(1)) + '</span></div>';
+    if(d) h += '<span class="disc">−'+Math.round(d)+' %</span>';
+    h += '</div>';
+    h += '<div class="grid">';
+    h += '<div class="cell"><i>Prix</i><b>'+money(r.price_cad)+'</b>'
+       + (d ? '<span class="sm">'+(num(r.price_before)!==null
+                                    ? '<s>'+money(r.price_before)+'</s>' : '')
+            + '<em>−'+Math.round(d)+' %</em></span>' : '')
+       + '</div>';
+    // Le ROI et les PIÈCES côte à côte : le premier dit si le set vaut la peine, le second
+    // s'il remplit l'envoi — les deux questions qu'on se pose devant la carte. La grille fait
+    // 3 colonnes, donc « Lot » descend d'une rangée et « Mois » prend la dernière en entier.
+    h += '<div class="cell"><i>ROI</i><b>'+(num(r.roi)===null?'—':num(r.roi).toFixed(2)+'×')+'</b></div>';
+    h += '<div class="cell"><i>Pièces</i><b>'+nfmt(r.pieces)+'</b></div>';
+    h += '<div class="cell"><i>Lot ×'+(r.qty||0)+'</i><b>'+money(r.lot_cost_cad)+'</b></div>';
+    h += '<div class="cell"><i>%/an</i><b>'+pct(r.annual_return_pct)+'</b></div>';
+    h += '<div class="cell"><i>$/an</i><b>'+money(r.annual_profit_total_cad)+'</b></div>';
+    h += '<div class="cell wide"><i>Délai de revente</i><b>'
+       + (num(r.months)===null?'—':Math.round(num(r.months))+' mois')+'</b></div>';
+    h += '</div>';
+    h += '<div class="acts">';
+    if(r.url) h += '<a class="act" href="'+esc(r.url)+'" target="_blank" rel="noopener">Acheter</a>';
+    h += '<button class="act solid" data-buy="'+esc(r.number)+'" data-vendor="'
+       + esc((r.source||'').charAt(0).toUpperCase()+(r.source||'').slice(1))
+       + '" data-qty="'+(r.qty||0)+'">J\'ai acheté</button>';
+    h += '</div></div>';
+    return h;
+  }
+
+  // ── the filter bar's three controls, and what they do to the list ───────────
+  function buyRows(){
+    var b = DASH.buy_list || {};
+    var rows = [];
+    (b.batch  || []).forEach(function(r){ r._batch = true;  rows.push(r); });
+    (b.others || []).forEach(function(r){ r._batch = false; rows.push(r); });
+    return rows;
+  }
+
+  function buyMatch(r){
+    if(BUYF.src && (r.source||'') !== BUYF.src) return false;
+    var q = BUYF.q.trim().toLowerCase();
+    if(!q) return true;
+    // every word must appear somewhere in the row — "star 2026", "flower amazon", "76342"
+    var hay = [r.name, r.number, r.set_id, r.source, r.year].join(' ').toLowerCase();
+    return q.split(/\s+/).every(function(w){ return hay.indexOf(w) >= 0; });
+  }
+
+  function buyCmp(){
+    // nulls always sink, whichever way the column is pointing
+    function hi(v){ var n = num(v); return n === null ? -Infinity : n; }
+    function lo(v){ var n = num(v); return n === null ?  Infinity : n; }
+    function desc(k){ return function(x,y){ return hi(y[k]) - hi(x[k]); }; }
+    function asc(k){  return function(x,y){ return lo(x[k]) - lo(y[k]); }; }
+    switch(BUYF.sort){
+      case 'pct':      return desc('annual_return_pct');
+      case 'roi':      return desc('roi');
+      case 'discount': return desc('discount');
+      case 'price_up': return asc('price_cad');
+      case 'price_dn': return desc('price_cad');
+      case 'months':   return asc('months');
+      case 'profit':   return desc('annual_profit_total_cad');
+      case 'name':     return function(x,y){
+                         return String(x.name||'').localeCompare(String(y.name||''), 'fr');
+                       };
+      default:         return asc('rank');
+    }
+  }
+
+  /** L'achat ne remplit pas un mois mais un ENVOI de 20 000 pieces. Sans le dire, un lot
+   *  qui depasse le budget parait absurde - alors qu'il est voulu : le plancher de pieces
+   *  prime, parce qu'un envoi incomplet immobilise le tri. */
+  // Les envois fermes depuis le telephone. dashboard.json n'est reecrit que par le PC,
+  // donc sans ca la carte continuerait d'afficher l'envoi comme ouvert jusqu'au
+  // prochain passage, et on cliquerait deux fois sans comprendre.
+  var CLOSED = {};
+
+  function shipmentCardHtml(b){
+    var s = b.shipment || {}, batch = b.batch || [];
+    var avail = (DASH.budget||{}).available;
+    var over = (b.batch_cost != null && avail != null && b.batch_cost > avail)
+             ? b.batch_cost - avail : 0;
+    var done = (s.have||0) + (b.batch_pieces||0);
+    var pct = s.target ? Math.min(100, Math.round(100 * done / s.target)) : 0;
+    var plural = batch.length > 1 ? 's' : '';
+    var h = '<div class="card">';
+    h += '<div class="lbl">'
+       + (s.name ? 'Completer l\'envoi \u00ab '+esc(s.name)+' \u00bb' : 'Nouvel envoi')
+       + '</div>';
+    if(s.have){
+      h += '<div class="kv"><span>Deja dans l\'envoi</span><b>'+nfmt(s.have)+' pieces</b></div>';
+      // Ce total melange deux choses : ce qui est sur la table et ce qui est achete
+      // mais pas encore livre. Sans le detail, on cherche des boites non arrivees.
+      (s.pending || []).forEach(function(x){
+        h += '<div class="kv sub2"><span>&nbsp;&nbsp;dont ' + esc(x.set)
+           + ' (acheté, pas reçu)</span><b>' + nfmt(x.pieces) + ' pieces</b></div>';
+      });
+    }
+    h += '<div class="kv"><span>A trouver</span><b>'+nfmt(s.need)+' pieces</b></div>';
+    h += '<div class="kv"><span>'+batch.length+' set'+plural+' propose'+plural+'</span><b>'
+       + nfmt(b.batch_pieces)+' pieces</b></div>';
+    h += '<div class="bar"><i style="width:'+pct+'%"></i></div>';
+    h += '<div class="kv"><span>Total de l\'envoi</span><b>'
+       + nfmt(done)+' / '+nfmt(s.target)+'</b></div>';
+    h += '<div class="kv"><span>Cout</span><b>'+money(b.batch_cost)+'</b></div>';
+    h += '<div class="kv"><span>Profit estime / an</span><b>'
+       + money(b.batch_annual_profit)+'</b></div>';
+    h += '<div class="kv"><span>Reste a investir</span><b>'+money(avail)+'</b></div>';
+    // Le bandeau ne s'affiche plus une fois l'envoi ferme : sinon on lit « complet,
+    // ferme-le » juste au-dessus de « ferme », et on clique deux fois.
+    // Ferme pour de vrai : ce que dit le registre (s.closed, remis a jour par getDashboard)
+    // ou ce qu'on vient de faire dans cette session (CLOSED, pour l'instant ou le tableau de
+    // bord n'a pas encore ete reecrit par le PC).
+    var fini = !!(s.closed || CLOSED[s.name]);
+    if(s.full && !fini){
+      h += '<div class="done">✔ L' + String.fromCharCode(39)
+         + 'envoi est complet : ' + nfmt(s.have) + ' pieces sur ' + nfmt(s.target)
+         + '. Ferme-le pour que le prochain classement vise un envoi neuf.</div>';
+    }
+    if(s.complete === false){
+      h += '<div class="gate">\u26a0 il manque '+nfmt((s.need||0)-(b.batch_pieces||0))
+         + ' pieces : les candidats rentables n\'y suffisent pas. On n\'achete pas moins bon '
+         + 'pour remplir, l\'envoi attendra le prochain rabais.</div>';
+    } else if(s.over > 0.15*(s.need||1)){
+      h += '<div class="gate">'+nfmt(s.over)+' pieces de plus que necessaire : le dernier set '
+         + 'deborde. Le surplus ouvrira l\'envoi suivant.</div>';
+    }
+    if(over > 0){
+      h += '<div class="gate">Budget depasse de '+money(over)
+         + ' - assume : un envoi incomplet immobilise le tri, un depassement ne fait '
+         + 'qu\'avancer une depense.</div>';
+    }
+    // Fermer l'envoi se décide ici, là où on voit son compte. Le bouton existe dès qu'un
+    // envoi est nommé : un envoi complet se ferme, un envoi incomplet peut se fermer aussi
+    // (on renonce à le remplir) — c'est la confirmation qui fait la différence.
+    if(s.name && !fini){
+      h += '<div class="acts"><button class="act" id="closebatch" data-batch="'
+         + esc(s.name) + '" data-full="' + (s.full ? '1' : '') + '">'
+         + 'Fermer l' + String.fromCharCode(39) + 'envoi ' + esc(s.name) + '</button></div>';
+    } else if(s.name && fini){
+      h += '<div class="done">Envoi ' + esc(s.name) + ' fermé. Le prochain classement '
+         + 'visera un envoi neuf.</div>';
+    }
+    return h + '</div>';
+  }
+
+  function nfmt(n){ return (n == null) ? '\u2014' : Number(n).toLocaleString('fr-CA'); }
+
+  function buyBarHtml(){
+    var h = '<div class="fbar">';
+    h += '<input id="buyq" type="search" inputmode="search" placeholder="Chercher un set, '
+       + 'un numéro, une année…" value="'+esc(BUYF.q)+'">';
+    h += '<div class="frow">';
+    [['', 'Tous'], ['amazon', 'Amazon'], ['costco', 'Costco']].forEach(function(o){
+      h += '<button class="fchip'+(BUYF.src===o[0]?' on':'')+'" data-src="'+o[0]+'">'
+         + esc(o[1])+'</button>';
+    });
+    h += '</div><div class="frow"><select class="fsel" id="buysort">';
+    BUY_SORTS.forEach(function(o){
+      h += '<option value="'+o[0]+'"'+(BUYF.sort===o[0]?' selected':'')+'>Trier : '
+         + esc(o[1])+'</option>';
+    });
+    h += '</select></div></div>';
+    return h;
+  }
+
+  function renderBuy(){
+    var el = document.getElementById('buy');
+    if(!DASH){ el.innerHTML = '<div class="center">Chargement&#8230;</div>'; return; }
+    if(DASH.ok === false){
+      el.innerHTML = '<div class="center">'+esc(DASH.error||'Tableau de bord indisponible.')+'</div>';
+      return;
+    }
+    var b = DASH.buy_list || {};
+    var batch = b.batch || [];
+    var h = '';
+    h += '<p class="asof">'
+       + (b.run_date ? 'Classement du '+esc(b.run_date) : "Aucun classement — lance « Rapport d'achat »")
+       + ' · mis à jour '+esc(ago(DASH.generated))+'</p>';
+    h += shipmentCardHtml(b);
+    h += buyBarHtml();
+    h += '<div id="buylist"></div>';
+    el.innerHTML = h;
+
+    var q = document.getElementById('buyq');
+    q.addEventListener('input', function(){
+      clearTimeout(q._t);
+      q._t = setTimeout(function(){ BUYF.q = q.value; renderBuyList(); }, 200);
+    });
+    document.getElementById('buysort').addEventListener('change', function(){
+      BUYF.sort = this.value; renderBuyList();
+    });
+    el.querySelectorAll('[data-src]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        BUYF.src = btn.getAttribute('data-src');
+        el.querySelectorAll('[data-src]').forEach(function(o){
+          o.classList.toggle('on', o.getAttribute('data-src') === BUYF.src);
+        });
+        renderBuyList();
+      });
+    });
+    var cb = document.getElementById('closebatch');
+    if(cb) cb.addEventListener('click', function(){
+      var name = cb.getAttribute('data-batch');
+      var full = !!cb.getAttribute('data-full');
+      var q = String.fromCharCode(39);
+      var br = String.fromCharCode(10, 10);
+      var msg = full
+        ? 'Fermer l' + q + 'envoi ' + name + ' ?' + br
+          + 'Il est complet. Plus aucun set ne pourra y être ajouté, et le prochain '
+          + 'classement visera un envoi neuf.'
+        : 'Fermer l' + q + 'envoi ' + name + ' ?' + br
+          + '⚠ Il n' + q + 'est PAS complet. Le fermer veut dire que tu renonces à le '
+          + 'remplir.';
+      msg += br + 'Réversible : le même bouton le rouvrira.';
+      if(!confirm(msg)) return;
+      cb.disabled = true; cb.textContent = '...';
+      google.script.run.withSuccessHandler(function(r){
+        cb.disabled = false;
+        if(r && r.ok){
+          CLOSED[name] = true;
+          toast(r.changed ? 'Envoi ' + name + ' fermé' : 'Envoi ' + name + ' était déjà fermé');
+          renderBuy();
+        } else {
+          cb.textContent = 'Fermer l' + String.fromCharCode(39) + 'envoi ' + name;
+          toast('Refusé : ' + ((r && r.error) || '?'));
+        }
+      }).withFailureHandler(function(e){
+        cb.disabled = false;
+        cb.textContent = 'Fermer l' + String.fromCharCode(39) + 'envoi ' + name;
+        toast('Échec : ' + e.message);
+      }).closeBatch(name, true);
+    });
+    renderBuyList();
+  }
+
+  /** Only the cards below the bar — so typing never steals the keyboard's focus. */
+  function renderBuyList(){
+    var el = document.getElementById('buylist');
+    if(!el) return;
+    var b = DASH.buy_list || {};
+    var batch = b.batch || [], others = b.others || [];
+    var h = '';
+
+    if(!buyFiltered()){                       // untouched: the emailed batch, then the rest
+      if(!batch.length){
+        h += '<div class="center">Aucun set retenu au dernier classement.</div>';
+      } else {
+        batch.forEach(function(r){ h += buyCard(r, false); });
+      }
+      if(others.length){
+        h += '<button class="more" id="toggleOthers">'
+           + (showOthers ? 'Masquer les autres candidats'
+                         : 'Voir les '+(b.others_total||others.length)+' autres candidats')
+           + '</button>';
+        if(showOthers) others.forEach(function(r){ h += buyCard(r, true); });
+      }
+    } else {                                  // filtered / sorted: one flat list
+      var rows = buyRows().filter(buyMatch).sort(buyCmp());
+      var total = batch.length + others.length;
+      h += '<div class="fcount"><span>'+rows.length+' set'+(rows.length>1?'s':'')
+         + ' sur '+total+'</span><button id="buyreset">Réinitialiser</button></div>';
+      if(!rows.length){
+        h += '<div class="center">Aucun candidat ne correspond.</div>';
+      } else {
+        rows.forEach(function(r){ h += buyCard(r, !r._batch); });
+      }
+    }
+    el.innerHTML = h;
+
+    var tog = document.getElementById('toggleOthers');
+    if(tog) tog.addEventListener('click', function(){ showOthers = !showOthers; renderBuyList(); });
+    var rst = document.getElementById('buyreset');
+    if(rst) rst.addEventListener('click', function(){
+      BUYF = {q:'', src:'', sort:'rank'}; renderBuy();
+    });
+    el.querySelectorAll('[data-buy]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        openPurchase({number: btn.getAttribute('data-buy'),
+                      vendor: btn.getAttribute('data-vendor'),
+                      qty: btn.getAttribute('data-qty')});
+      });
+    });
+  }
+
+  /** L'onglet Historique : les sets LIVRÉS, du plus récent au plus ancien.
+   *
+   *  La source est `delivered` dans dashboard.json, que le PC tire de la table `sent` — au
+   *  « Livré » le dossier du set part à la corbeille, donc sort_index.json ne le liste plus
+   *  et il n'y a rien à balayer. Même vignette Brickset que la liste de tri : on reconnaît
+   *  un set à sa boîte bien avant de lire son numéro. */
+  function renderHist(){
+    var el = document.getElementById('hist');
+    if(!DASH){ el.innerHTML = '<div class="center">Chargement&#8230;</div>'; return; }
+    if(DASH.ok === false){
+      el.innerHTML = '<div class="center">' + esc(DASH.error || 'Indisponible.') + '</div>';
+      return;
+    }
+    var rows = DASH.delivered || [];
+    if(!rows.length){
+      el.innerHTML = '<div class="center">Aucun set livré pour le moment.</div>';
+      return;
+    }
+    var h = '<p class="asof">' + rows.length + ' set(s) livré(s) · mis à jour '
+          + esc(ago(DASH.generated)) + '</p>';
+    var last = '';
+    rows.forEach(function(r){
+      if(r.sent_date !== last){        // un intertitre par date d'envoi : on lit par colis
+        last = r.sent_date;
+        h += '<p class="asof" style="margin-top:14px">' + esc(r.sent_date)
+           + (r.batch ? ' · envoi ' + esc(r.batch) : '') + '</p>';
+      }
+      h += '<div class="card"><div class="hrow">'
+         + '<img src="' + imgUrl(r.number) + '" onerror="this.style.visibility=&quot;hidden&quot;">'
+         + '<div class="hname">' + esc(r.name || r.set_id)
+         + '<span>' + esc(r.number) + (r.batch ? ' · envoi ' + esc(r.batch) : '') + '</span></div>'
+         + '<div class="hqty">×' + nfmt(r.qty) + '</div>'
+         + '</div></div>';
+    });
+    el.innerHTML = h;
+  }
+
+  function renderFin(){
+    var el = document.getElementById('fin');
+    var h = '';
+    if(DASH && DASH.ok === false){
+      h += '<div class="card"><div class="sub">⚠ '+esc(DASH.error||'Tableau de bord indisponible.')
+         + '</div></div>';
+    } else if(!DASH){
+      el.innerHTML = '<div class="center">Chargement&#8230;</div>'; return;
+    } else {
+      var bu = DASH.budget || {}, b = DASH.buy_list || {};
+      var av = num(bu.available);
+      h += '<p class="asof">Mis à jour '+esc(ago(DASH.generated))+'</p>';
+      h += '<div class="card"><div class="lbl">Reste à investir</div>';
+      h += '<div class="big '+(av!==null && av<0 ? 'neg':'pos')+'">'+money(bu.available)+'</div>';
+      h += '<div class="sub">Budget accordé '+money(bu.granted!==null?bu.granted:bu.fallback_monthly)
+         + ' − dépensé '+money(bu.spent)+' depuis '+esc(bu.anchor||'?')
+         + ' · '+(bu.months_elapsed||1)+' mois'+(bu.dynamic?'':' (budget fixe — feuille injoignable)')+'</div>';
+      if((bu.months||[]).length){
+        h += '<div class="chips">';
+        bu.months.slice(-6).forEach(function(m){
+          h += '<span class="chip">'+esc(m.month)+' · '+money(m.amount)+'</span>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
+
+      h += '<div class="card"><div class="lbl">Lot du mois</div>';
+      h += '<div class="kv"><span>'+((b.batch||[]).length)+' set(s) · '+esc(b.run_date||'?')
+         + '</span><b>'+money(b.batch_cost)+'</b></div>';
+      h += '<div class="kv"><span>Profit estimé / an</span><b>'+money(b.batch_annual_profit)+'</b></div>';
+      h += '<button class="act solid" id="goBuy" style="margin-top:10px">Voir la liste d\'achat</button>';
+      h += '</div>';
+
+      (DASH.inventory || []).forEach(function(iv){
+        h += '<div class="card"><div class="lbl">Inventaire CFB — '+esc(iv.vendor)+'</div>';
+        h += '<div class="big">'+money(iv.total)+'</div>';
+        h += '<div class="sub">CA '+money(iv.ca)+' · US '+money(iv.us)+'<br>'
+           + (iv.pieces||0).toLocaleString('fr-CA')+' pièces · '
+           + (iv.lots||0).toLocaleString('fr-CA')+' lots · au '+esc(iv.as_of||'?')+'</div></div>';
+      });
+
+      h += '<div class="card"><div class="lbl">État</div><div class="chips">';
+      (DASH.cookies || []).forEach(function(c){
+        var ok = c.status==='ok';
+        h += '<span class="chip '+(ok?'ok':(c.status==='expired'?'bad':''))+'">Cookie '+esc(c.source)
+           + ' · '+(ok?'OK':(c.status==='expired'?'expiré':'?'))
+           + (c.checked ? ' ('+esc(ago(c.checked))+')' : '')+'</span>';
+      });
+      var f = DASH.freshness || {};
+      function fresh(label, days, limit){
+        if(days===null || days===undefined) return '';
+        var cls = (limit && days > limit) ? 'warn' : '';
+        return '<span class="chip '+cls+'">'+label+' '+days+' j</span>';
+      }
+      h += fresh('Catalogue', f.catalog_days, f.catalog_stale_days);
+      h += fresh('Prix', f.priceguide_days, f.priceguide_stale_days);
+      h += '</div></div>';
+    }
+
+    h += '<div class="card"><div class="lbl">Demander au PC</div>';
+    h += '<div class="sub" style="margin:4px 0 11px">Le PC exécute dès qu\'il tourne.</div>';
+    h += '<div class="jobs">';
+    JOBS.forEach(function(j){
+      var q = jobState(j.a);
+      var last = ((DASH && DASH.jobs) || {})[j.a] || '';
+      var busy = q && (q.status==='pending' || q.status==='running');
+      var ic = busy ? (q.status==='running' ? '⚙' : '⏳') : j.ic;
+      var line = q && q.status==='done' ? '✓ '+(q.result||'fait')
+               : q && q.status==='error' ? '⚠ '+(q.result||'erreur')
+               : busy ? (q.status==='running' ? 'en cours sur le PC…' : 'en attente du PC…')
+               : (last ? 'dernière fois : '+ago(last) : j.d);
+      h += '<button class="job'+(busy?' busy':'')+'" data-job="'+j.a+'">';
+      h += '<span class="ji">'+ic+'</span><span class="jt"><b>'+esc(j.t)+'</b><span>'
+         + esc(line)+'</span></span></button>';
+    });
+    h += '</div></div>';
+    el.innerHTML = h;
+    var go = document.getElementById('goBuy');
+    if(go) go.addEventListener('click', function(){ showTab('achats'); });
+    el.querySelectorAll('[data-job]').forEach(function(btn){
+      btn.addEventListener('click', function(){ queueJob(btn.getAttribute('data-job')); });
+    });
+  }
+
+  function queueJob(a){
+    var j = JOBS.filter(function(x){ return x.a===a; })[0];
+    if(!j) return;
+    if(!confirm(j.q+'\n(le PC le fera dès qu\'il tourne)')) return;
+    JOBQ[a] = {status:'pending', result:''};
+    renderFin();
+    google.script.run.withSuccessHandler(function(r){
+      if(r && r.ok){ toast(j.t+' demandé ✓'); schedulePoll(); }
+      else { toast('Refusé : '+((r&&r.error)||'?')); delete JOBQ[a]; renderFin(); }
+    }).withFailureHandler(function(e){
+      toast('Échec : '+e.message); delete JOBQ[a]; renderFin();
+    }).queueCommand('', a);
+  }
+
+  function statusOf(s){
+    // « Prêt pour livraison » passe avant tout : le maître est construit, le set est emballé,
+    // son avancement de tri n'a plus rien à dire. Même règle qu'au bureau (gui.status_for).
+    if(s.phase === 'Prêt pour livraison')
+      return {label:'Prêt pour livraison', cls:'purple', chips:false};
+    // L'envoi n'est pas fermé : la numérotation des Sacs n'est pas figée, donc on ne trie
+    // pas encore. Le PC fait basculer en « Trier » dès la fermeture (batch.settle_phases).
+    if(s.phase === 'En attente de fermeture du batch')
+      return {label:'En attente de fermeture', cls:'amber', chips:false};
+    // Acheté, encore chez le transporteur. La phase tombe toute seule au courriel de
+    // livraison (sortpack/deliveries.py) — rien à faire à la main.
+    if(s.phase === 'En attente de livraison')
+      return {label:'En attente de livraison', cls:'slate', chips:false};
+    // Avant tout : les sachets des N boites sont-ils repartis en piles par numero ? Il faut
+    // le faire D'ABORD, sinon le cataloguage par sac devient impossible. Purement physique,
+    // donc un geste — le PC met deja `separated` a vrai des qu'un sac numerote existe.
+    if(!s.separated) return {label:'Séparer les sacs', cls:'blue', chips:false};
+    if(s.base === 'Cataloguer') return {label:'Cataloguer', cls:'gray', chips:false};
+    // Envoi pas encore ferme : la numerotation des Sacs peut bouger, donc on ne trie pas.
+    if(s.batch_open) return {label:'En attente de fermeture', cls:'amber', chips:false};
+    if(!s.bags) return {label:'Cataloguer', cls:'gray', chips:false};
+    var d = s.done.length;
+    if(d >= s.bags && s.bags > 0 && !s.cataloguing && s.batch){
+      // Trie, mais son envoi ne l'est pas : plus rien a faire ici, et il ne part pas pour
+      // autant — le maitre couvre tout l'envoi. « Trie ✓ » se lirait « pret a expedier ».
+      // Meme regle qu'au bureau (gui.status_for / batch.rest_pending).
+      var rest = SETS.filter(function(x){
+        return x.batch === s.batch && x.key !== s.key
+            && (x.cataloguing || !(x.bags > 0 && x.done.length >= x.bags)); });
+      if(rest.length)
+        return {label:'En attente du reste du batch', cls:'amber', chips:true};
+    }
+    if(d >= s.bags) return {label:'Trié ✓ ('+d+'/'+s.bags+')', cls:'green', chips:true};
+    if(s.cataloguing) return {label:'Trier ('+d+'/'+s.bags+') · cataloguage en cours',
+                              cls:'orange', chips:true};
+    return {label:'Trier ('+d+'/'+s.bags+')', cls:'orange', chips:true};
+  }
+
+  /** The purchase FAB would sit on top of the sorting panel's green button, and you are
+   *  not logging a purchase while sorting a bag — so it steps aside. */
+  function syncFab(){
+    var fab = document.getElementById('fab');
+    // L'Historique regarde ce qui est parti : on n'y saisit pas un achat, et le bouton
+    // flottant passait par-dessus la derniere carte pour rien.
+    if(fab) fab.style.display = (TAB==='fin' || TAB==='hist' || PANEL.key) ? 'none' : '';
+  }
+
+  function render(){
+    var app = document.getElementById('app');
+    if(!SETS.length){ app.innerHTML = '<div class="center">Aucun set en cours.</div>'; return; }
+    var html = '';
+    SETS.forEach(function(s){
+      var st = statusOf(s);
+      html += '<div class="card" data-key="'+esc(s.key)+'">';
+      var opened = !!OPEN[s.key];
+      html += '<div class="row1'+(st.chips||s.base!=='Cataloguer' ? ' tap' : '')+'" data-toggle="1">';
+      html += '<img class="thumb" src="'+imgUrl(s.number)+'" onerror="this.style.visibility=&quot;hidden&quot;">';
+      html += '<div class="name">'+esc(s.name)+'</div>';
+      html += '<span class="pill '+st.cls+'">'+esc(st.label)+'</span>';
+      if(st.chips||s.base!=='Cataloguer') html += '<span class="caret">'+(opened?'⌃':'⌄')+'</span>';
+      html += '</div>';
+      if(st.chips && opened){
+        html += '<div class="bags">';
+        for(var b=1;b<=s.bags;b++){
+          var on = s.done.indexOf(b)>=0;
+          var open = (PANEL.key===s.key && PANEL.bag===b);
+          html += '<span class="bagwrap">'
+                + '<button class="bag'+(on?' on':'')+'" data-bag="'+b+'">'+(on?'✓':b)+'</button>'
+                + '<button class="bagx'+(open?' on':'')+'" data-open="'+b+'" '
+                + 'title="Restants de ce sac">'+(open?'⌃':'⌄')+'</button></span>';
+        }
+        html += '</div>';
+        if(PANEL.key===s.key) html += panelHtml(s);
+      }
+      // Le seul chemin pour sortir de « Séparer les sacs » : ce bouton. Il ne choisit
+      // aucune phase — il note le travail physique, le reste se déduit des fichiers.
+      if(opened && st.label === 'Séparer les sacs'){
+        html += '<div class="acts"><button class="act solid" data-act="separated">'
+             + 'Séparation terminée' + '</button></div>'
+             + '<div class="hint">Répartis les sachets numérotés des boîtes en piles par '
+             + 'numéro &#8212; après, le cataloguage par sac n&#39;est plus possible.</div>';
+      }
+      if(s.base==='Cataloguer'){
+        html += '<div class="hint">Cataloguage en cours &#8212; rien à trier pour l\'instant.</div>';
+      } else if(s.cataloguing){
+        // Set d'un envoi ferme : les Sacs sont ouverts et numerotes une fois pour toutes,
+        // donc les sacs deja catalogues se trient pendant qu'on catalogue le reste.
+        html += '<div class="hint">Cataloguage en cours &#8212; les sacs déjà faits se trient, '
+             + 'les suivants apparaîtront ici.</div>';
+      }
+      if(s.base !== 'Cataloguer' && opened){
+        // « Appliquer restant » is gone: leftovers are placed one at a time, in the bag you
+        // are on, by « Fait » / « L'ajouter ici ». So building is gated on the sorting being
+        // finished and nothing else — it used to wait on that button, which would have left
+        // « Construire CFB » disabled for ever once the button was removed.
+        // Un set dont le cataloguage n'est pas fini n'est jamais « tout trie » : d'autres
+        // sacs vont arriver, et les cocher tous ne veut pas dire que la boite est vide.
+        var allSorted = s.bags>0 && s.done.length>=s.bags && !s.cataloguing;
+        if(s.batch){
+          // Un set d'ENVOI ne part jamais seul : le maitre couvre tout l'envoi, et il se
+          // construit sur le PC (« Construire le CFB du batch »). Le PC refusait deja la
+          // demande par set (remote._do_build_cfb) — mais apres coup, une fois le bouton
+          // presse. Ici on ne le propose plus du tout, et on dit ce qui manque.
+          var mates = SETS.filter(function(x){ return x.batch === s.batch; });
+          var left  = mates.filter(function(x){
+            return x.cataloguing || !(x.bags>0 && x.done.length>=x.bags); });
+          html += '<div class="gate">'
+               + (allSorted ? '✓ Ce set est trié. ' : '')
+               + 'Envoi &laquo;&nbsp;'+esc(s.batch)+'&nbsp;&raquo; &#8212; le maître se construit '
+               + 'pour tout l&#39;envoi, sur le PC.';
+          if(left.length){
+            html += '<br>Reste &#224; finir : '
+                 + left.map(function(x){ return esc(x.number || x.name); }).join(', ') + '.';
+          } else {
+            html += '<br>Tout l&#39;envoi est tri&#233; : lance &laquo;&nbsp;Construire le CFB '
+                 + 'du batch&nbsp;&raquo; sur le PC.';
+          }
+          html += '</div>';
+        } else {
+          html += '<div class="acts">';
+          html += '<button class="act solid'+(allSorted?'':' off')+'" data-act="build_cfb"'+(allSorted?'':' disabled')+'>Construire CFB</button>';
+          html += '</div>';
+          if(!allSorted){
+            html += '<div class="gate">Trie tous les sacs pour activer les actions.</div>';
+          }
+        }
+      }
+      if(s.cmd){
+        var ic = {pending:'⏳',running:'⚙',done:'✓',error:'⚠'}[s.cmd.status] || '';
+        var an = s.cmd.action==='restants' ? 'Appliquer restant' : 'Construire CFB';
+        html += '<div class="cmd '+s.cmd.status+'">'+ic+' '+an+' &#8212; '+esc(s.cmd.result || s.cmd.status)+'</div>';
+      }
+      html += '</div>';
+    });
+    app.innerHTML = html;
+    syncFab();
+    app.querySelectorAll('.card').forEach(function(card){
+      var key = card.getAttribute('data-key');
+      card.querySelectorAll('.bag').forEach(function(btn){
+        btn.addEventListener('click', function(){ toggleBag(key, parseInt(btn.getAttribute('data-bag'),10)); });
+      });
+      card.querySelectorAll('.act').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var a = btn.getAttribute('data-act');
+          // « Ouverture terminée » n'est pas une demande au PC : c'est une phase, écrite tout
+          // de suite dans le registre partagé. Le PC enchaîne ensuite de lui-même.
+          if(a === 'separated') return finishSeparating(key, btn);
+          queueAction(key, a);
+        });
+      });
+      card.querySelectorAll('.bagx').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          openPanel(key, parseInt(btn.getAttribute('data-open'), 10));
+        });
+      });
+      card.querySelectorAll('[data-close]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          PANEL = {key:null, bag:0, data:null, loading:false, q:'', open:null, err:null, openPart:null};
+          render();
+        });
+      });
+      card.querySelectorAll('[data-calc]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var k = btn.getAttribute('data-calc');
+          PANEL.open = (PANEL.open === k) ? null : k;
+          render();
+        });
+      });
+      card.querySelectorAll('[data-done]').forEach(function(btn){
+        btn.addEventListener('click', function(){ markDone(btn.getAttribute('data-done')); });
+      });
+      card.querySelectorAll('[data-part]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var k = btn.getAttribute('data-part');
+          PANEL.openPart = (PANEL.openPart === k) ? null : k;
+          render();
+        });
+      });
+      card.querySelectorAll('[data-add]').forEach(function(btn){
+        btn.addEventListener('click', function(){ moveHere(btn.getAttribute('data-add'), true); });
+      });
+      card.querySelectorAll('[data-move]').forEach(function(btn){
+        btn.addEventListener('click', function(){ moveHere(btn.getAttribute('data-move')); });
+      });
+      var q = card.querySelector('#restq');
+      if(q){
+        q.addEventListener('input', function(){
+          PANEL.q = q.value;
+          clearTimeout(q._t);
+          q._t = setTimeout(function(){
+            var at = q.selectionStart;
+            render();
+            var nq = document.getElementById('restq');
+            if(nq){ nq.focus(); try{ nq.setSelectionRange(at, at); }catch(e){} }
+          }, 250);
+        });
+      }
+      var pill = card.querySelector('.pill');
+      if(pill) pill.addEventListener('click', function(ev){ ev.stopPropagation(); openPhase(key); });
+      var row = card.querySelector('.row1[data-toggle]');
+      if(row) row.addEventListener('click', function(){
+        OPEN[key] = !OPEN[key];
+        if(!OPEN[key] && PANEL.key === key){        // closing the card closes its panel
+          PANEL = {key:null, bag:0, data:null, loading:false, q:'', open:null, openPart:null, err:null};
+        }
+        render();
+      });
+    });
+  }
+
+  // ── Sorting panel: « je suis au sac N et j'ai cette pièce en main » ─────────
+  // The PC writes restants_<set>.json at Apply: each leftover with its physical quantity,
+  // its destination Sac, and the bags that still hold that part (self) or its sister
+  // colours (sisters). That's all the phone needs to decide, for ANY bag, whether the part
+  // can go straight to its Sac or has to wait in a C / D box.
+  var PANEL = {key:null, bag:0, data:null, loading:false, q:'', open:null,
+             openPart:null, err:null, move:null, done:null};
+  var cmdPoll = {move:null, done:null};
+
+  /** BrickLink's own thumbnail, ~4 KB: nothing to host, nothing in the JSON — the id,
+   *  the colour and the item type are already there. Missing art just hides itself. */
+  function partImg(o){
+    var t = (o.type || 'P') + 'T';
+    var col = (o.color_id !== undefined && o.color_id !== '') ? o.color_id
+            : String(o.key||'').split('|')[1] || 0;
+    return 'https://img.bricklink.com/ItemImage/'+t+'/'+col+'/'+encodeURIComponent(o.id)+'.t1.png';
+  }
+  function imgTag(o, cls){
+    // not loading="lazy": every state change re-renders the list, which restarts a lazy
+    // load before it finishes. These thumbnails are 3-8 KB and the lists are short.
+    return '<img class="'+cls+'" src="'+partImg(o)
+         + '" onerror="this.style.visibility=&quot;hidden&quot;">';
+  }
+
+  function openPanel(key, bag){
+    if(PANEL.key===key && PANEL.bag===bag){ PANEL = {key:null,bag:0,data:null,loading:false,q:'',open:null,err:null, openPart:null}; render(); return; }
+    var s = SETS.filter(function(x){ return x.key===key; })[0];
+    OPEN[key] = true;                                      // the panel lives under the chips
+    var keep = (PANEL.key===key) ? PANEL.data : null;      // same set, other bag: keep data
+    PANEL = {key:key, bag:bag, data:keep, loading:!keep, q:'', open:null,
+             openPart:null, err:null};
+    render();
+    if(keep || !s) return;
+    google.script.run.withSuccessHandler(function(d){
+      if(PANEL.key!==key) return;
+      PANEL.loading = false;
+      if(d && d.ok) PANEL.data = d; else PANEL.err = (d && d.error) || 'liste indisponible';
+      render();
+    }).withFailureHandler(function(e){
+      if(PANEL.key!==key) return;
+      PANEL.loading = false; PANEL.err = e.message; render();
+    }).getRestants(s.number);
+  }
+
+  /** "02" for 2, "" when there is no number to show. */
+  function pad2(n){
+    return (n === null || n === undefined || n === '') ? '' : (n < 10 ? '0'+n : ''+n);
+  }
+
+  /** What to do with this leftover, standing at the end of bag index `bi`.
+   *  The box carries its NUMBER (r.cbin / r.dbin, from the plan): a bare "boîte D" does
+   *  not say which of the boxes to open. A leftover the plan never had to stage has no
+   *  number yet — placing it in the bag being sorted assigns one, and the PC answers with
+   *  the remark that names it. */
+  function verdict(r, bi){
+    var later = (r.self||[]).filter(function(b){ return b > bi; });
+    if(later.length) return {do:'c', bags:later,
+      text:'Garde-la — cette couleur revient', box:boxName('C', r.cbin)};
+    var sis = (r.sisters||[]).filter(function(b){ return b > bi; });
+    if(sis.length) return {do:'d', bags:sis,
+      text:'Garde-la — les couleurs sœurs arrivent', box:boxName('D', r.dbin)};
+    return {do:'sac', bags:[], text:'', box:''};
+  }
+
+  /** "boîte C02", or an honest "une boîte C" when the plan has not opened one for this lot
+   *  yet — "boîte C" alone reads like a box actually called C. « Fait » settles it: the
+   *  re-plan assigns the box and the remark it sends back names it. */
+  function boxName(letter, n){
+    var num = pad2(n);
+    return num ? ('boîte '+letter+num)
+               : ('une boîte '+letter+' (le PC dira laquelle avec « Fait »)');
+  }
+
+  /** Le plan d'un envoi marche sur les sacs de PLUSIEURS sets, et chacun a son « 1 ». On
+   *  nomme donc le set quand le sac n'est pas celui qu'on a sous les yeux, sinon
+   *  « garde-la jusqu'au sac 3 » envoie chercher le mauvais sac. */
+  function bagLabels(idx){
+    var d = PANEL.data || {}, b = d.bags || [], own = d.bag_owner || [], me = d.set;
+    return idx.map(function(i){
+      var lab = b[i]!==undefined ? b[i] : (i+1);
+      return (own[i] && me && String(own[i]) !== String(me)) ? (lab+' de '+own[i]) : lab;
+    }).join(', ');
+  }
+
+  /** Chip N is the NUMBERED bag N, but the plan walks FILES — and a numbered bag can be
+   *  several ("1", "1 - 1", "1 - 2 (petit)"). Being "at the end of bag N" means being past
+   *  the LAST file of that bag, so that is the index we compare against. */
+  function bagIndexFor(n){
+    // Le PC envoie la correspondance pour CE set (restants.bag_help) : dans un envoi, la
+    // recherche par etiquette ci-dessous tomberait sur le sac 1 d'un autre set.
+    var map = (PANEL.data && PANEL.data.bag_index) || null;
+    if(map && map[String(n)] !== undefined) return map[String(n)];
+    var b = (PANEL.data && PANEL.data.bags) || [];
+    var last = -1;
+    for(var i=0;i<b.length;i++){
+      var m = String(b[i]).match(/^\s*(\d+)/);
+      if(m && parseInt(m[1],10) === n) last = i;
+    }
+    return last >= 0 ? last : (n - 1);
+  }
+
+  function restRow(r, bi){
+    var isOpen = (PANEL.open === r.key);
+    var h = '<div class="rest">';
+    h += '<div class="rl">'+imgTag(r, 'pimg')+'<div class="rn">'+esc(r.name)
+       + '<br><i>'+esc(r.color)+' · '+esc(r.id)+'</i></div>';
+    h += '<div class="rq">×'+r.qty+'</div>';
+    h += '<button class="mini" data-calc="'+esc(r.key)+'">'
+       + (isOpen ? 'Fermer' : 'Calculer') + '</button></div>';
+    if(isOpen){
+      var v = verdict(r, bi);
+      if(v.do === 'sac'){
+        h += '<div class="verdict go"><b>➜ Sac '+(r.sac<10?'0':'')+r.sac+'</b>'
+           + (r.colors && r.colors.length ? '<br>Groupe de couleurs : '+esc(r.colors.join(', ')) : '')
+           + (r.remark ? '<br><i>déjà noté : '+esc(r.remark)+'</i>' : '')
+           + '</div>';
+      } else {
+        h += '<div class="verdict wait">⏸ '+esc(v.text)+' au sac '+esc(bagLabels(v.bags))+'.'
+           + '<br>Mets-la en <b>'+esc(v.box)+'</b>'
+           + (v.do==='d' && r.colors && r.colors.length ? ' ('+esc(r.colors.join(', '))+')' : '')
+           + ' — destination finale <b>Sac '+(r.sac<10?'0':'')+r.sac+'</b>.</div>';
+      }
+      var dn = (PANEL.done && PANEL.done.key === r.key) ? PANEL.done : null;
+      if(dn && dn.status !== 'done' && dn.status !== 'error'){
+        h += '<div class="verdict wait">⏳ Le PC la met dans le sac '+PANEL.bag
+           + ' et recalcule les remarques…</div>';
+      } else if(dn){
+        h += '<div class="verdict '+(dn.status==='error'?'wait':'go')+'">'
+           + (dn.status==='error' ? '⚠ ' : '✓ ')+esc(dn.result)+'</div>';
+      } else {
+        h += '<div class="vrow"><button class="mini go" data-done="'+esc(r.key)+'">'
+           + '✓ Fait — la mettre dans le sac '+PANEL.bag+'</button></div>';
+      }
+    }
+    return h + '</div>';
+  }
+
+  /** A search hit: one compact line. The decision only appears when you tap it — a verdict
+   *  under every match buried the list. */
+  function partRow(p, bi){
+    var isOpen = (PANEL.openPart === p.key);
+    var left = (p.bags||[]).filter(function(b){ return b > bi; });
+    var dot = p.absent ? '⚠' : (!p.bags || !p.bags.length ? '·'
+                                    : (left.length ? '⏸' : '✓'));
+    var h = '<button class="prow'+(isOpen?' on':'')+'" data-part="'+esc(p.key)+'">'
+          + '<span class="pd">'+dot+'</span>'+imgTag(p, 'pimg sm')
+          + '<span class="pn">'+esc(p.name)+' <i>'+esc(p.color)+'</i></span>'
+          + '<span class="pq">×'+p.qty+'</span></button>';
+    if(!isOpen) return h;
+    if(p.absent){
+      // The catalogue says the set contains it but no file lists it any more — the lot was
+      // deleted from a bag because it wasn't there. Now it has turned up, so put it back.
+      h += '<div class="verdict wait">⚠ Plus listée dans aucun fichier du set '
+         + '(supprimée d\'un sac). Le catalogue en attend <b>'+p.qty+'</b> — '
+         + 'rajoute-la au sac où tu es :</div>';
+      var mva = PANEL.move && PANEL.move.key === p.key ? PANEL.move : null;
+      if(mva && mva.status !== 'done' && mva.status !== 'error'){
+        h += '<div class="verdict wait">⏳ Le PC la remet dans le sac '+PANEL.bag+'…</div>';
+      } else if(mva){
+        h += '<div class="verdict '+(mva.status==='error'?'wait':'go')+'">'
+           + (mva.status==='error' ? '⚠ ' : '✓ ')+esc(mva.result)+'</div>';
+      } else {
+        h += '<div class="vrow">'
+           + '<input class="qin" id="mvq" inputmode="numeric" value="'+p.qty+'">'
+           + '<button class="mini go" data-add="'+esc(p.key)+'">➜ L\'ajouter ici (sac '
+           + PANEL.bag+')</button></div>';
+      }
+    } else if(!p.bags || !p.bags.length){
+      h += '<div class="verdict go">Listée dans aucun sac — elle est déjà passée '
+         + '(Sac, B ou C) : place-la à l\'œil, Sac '+(p.sac<10?'0':'')+p.sac+'.</div>';
+    } else if(left.length){
+      var lbl = bagLabels(left);
+      h += '<div class="verdict wait">⏸ Elle est cataloguée au sac '+esc(lbl)+'.'
+         + '<br>Mets-la dans <b>'+esc(lbl.split(', ')[0])+'.bsx</b> — ou traite-la ici tout de suite :'
+         + '</div>';
+      var avail = p.qty;
+      var mv = PANEL.move && PANEL.move.key === p.key ? PANEL.move : null;
+      if(mv && mv.status !== 'done' && mv.status !== 'error'){
+        h += '<div class="verdict wait">⏳ Déplacement demandé — le PC recalcule le plan…</div>';
+      } else if(mv){
+        h += '<div class="verdict '+(mv.status==='error'?'wait':'go')+'">'
+           + (mv.status==='error' ? '⚠ ' : '✓ ')+esc(mv.result)+'</div>';
+      } else {
+        h += '<div class="vrow">'
+           + '<input class="qin" id="mvq" inputmode="numeric" value="'+avail+'">'
+           + '<button class="mini go" data-move="'+esc(p.key)+'">➜ La traiter ici (sac '
+           + PANEL.bag+')</button></div>';
+        h += '<div class="none" style="padding:4px 2px 0">sur '+avail+' au total'
+           + (PANEL.data && PANEL.data.multiplier > 1
+              ? ' · par multiples de '+PANEL.data.multiplier+' (tes '
+                + PANEL.data.multiplier+' exemplaires)' : '')+'</div>';
+      }
+    } else {
+      h += '<div class="verdict go">✓ Déjà faite (sac '+esc(bagLabels(p.bags))+') — '
+         + 'elle est en Sac '+(p.sac<10?'0':'')+p.sac+' ou en boîte.</div>';
+    }
+    return h;
+  }
+
+  /** Move a part catalogued further on into the bag being sorted: it is already in your
+   *  hand, so the PC takes the quantity out of the later bag, puts it here and re-plans. */
+  /** Put a part into the bag being sorted. Two sources, one gesture: `fromCatalog` means
+   *  no file lists it any more (it was deleted from a bag) so the PC recreates the lot from
+   *  the catalogue; otherwise it is drained out of a later bag. */
+  function moveHere(key, fromCatalog){
+    var d = PANEL.data; if(!d) return;
+    var p = (d.parts||[]).filter(function(x){ return x.key===key; })[0];
+    if(!p) return;
+    var bi = bagIndexFor(PANEL.bag);
+    var left = (p.bags||[]).filter(function(b){ return b > bi; });
+    if(!fromCatalog && !left.length){ toast('Plus rien a deplacer pour cette piece.'); return; }
+    var box = document.getElementById('mvq');
+    var qty = box ? parseInt(box.value, 10) : p.qty;
+    if(!(qty > 0)){ toast('Quantite invalide.'); return; }
+    PANEL.move = {key:key, status:'pending', result:''};
+    render();
+    var payload = {key:key, to_bag:bi, qty:qty};
+    if(fromCatalog) payload.source = 'catalog';
+    google.script.run.withSuccessHandler(function(r){
+      if(r && r.ok){ pollCmd('restant_move', key); }
+      else { toast('Refusé : '+((r&&r.error)||'?')); PANEL.move = null; render(); }
+    }).withFailureHandler(function(e){
+      toast('Échec : '+e.message); PANEL.move = null; render();
+    }).queueCommand(PANEL.key, 'restant_move', payload);
+  }
+
+  /** Watch a queued leftover command (restant_move / restant_done) until the PC reports
+   *  back, then show WHAT TO DO with the part (that is the whole point) and take the
+   *  refreshed list it just changed. */
+  function pollCmd(action, key, tries){
+    tries = tries || 0;
+    var slot = (action === 'restant_done') ? 'done' : 'move';
+    clearTimeout(cmdPoll[slot]);
+    if(tries > 20){                                  // ~3 min: the PC is probably not running
+      if(PANEL[slot] && PANEL[slot].key === key){
+        PANEL[slot] = {key:key, status:'error',
+                       result:"toujours en attente — le PC ne tourne peut-être pas."};
+        render();
+      }
+      return;
+    }
+    cmdPoll[slot] = setTimeout(function(){
+      var setKey = PANEL.key;
+      var num = (SETS.filter(function(x){ return x.key===setKey; })[0]||{}).number;
+      google.script.run.withSuccessHandler(function(d){
+        if(!(PANEL[slot] && PANEL[slot].key === key)) return;
+        var c = d && d.cmds && d.cmds[action];
+        if(c && c.key === key && (c.status === 'done' || c.status === 'error')){
+          PANEL[slot] = {key:key, status:c.status, result:c.result || c.status};
+          if(d.ok) PANEL.data = d;                   // the plan moved: take the new list
+          render();
+          return;
+        }
+        pollCmd(action, key, tries + 1);
+      }).withFailureHandler(function(){ pollCmd(action, key, tries + 1); }).getRestants(num);
+    }, 9000);
+  }
+
+  function panelHtml(s){
+    var bi = bagIndexFor(PANEL.bag);              // end of numbered bag N, in plan-file terms
+    var h = '<div class="panel"><div class="ph"><b>Sac '+PANEL.bag+' — restants</b>'
+          + '<button class="mini" data-close="1">Fermer</button></div>';
+    if(PANEL.loading) return h + '<div class="none">Chargement…</div></div>';
+    if(PANEL.err) return h + '<div class="none">⚠ '+esc(PANEL.err)+'</div></div>';
+    var d = PANEL.data || {restants:[], parts:[]};
+    h += '<input id="restq" placeholder="Chercher une pièce…" value="'+esc(PANEL.q)+'">';
+    // A placed leftover leaves the list, but its answer — the box or the Sac the PC just
+    // decided — is the whole point, so it stays at the top of the panel until you move on.
+    var dn = PANEL.done;
+    if(dn && !(d.restants||[]).some(function(x){ return x.key === dn.key; })){
+      h += (dn.status === 'done' || dn.status === 'error')
+         ? '<div class="verdict '+(dn.status==='error'?'wait':'go')+'">'
+           + (dn.status==='error'?'⚠ ':'✓ ')+esc(dn.result)+'</div>'
+         : '<div class="verdict wait">⏳ Le PC place le restant dans le sac '+PANEL.bag+'…</div>';
+    }
+    var q = (PANEL.q||'').trim().toLowerCase();
+    var list = (d.restants||[]).filter(function(r){
+      return !q || (r.name+' '+r.color+' '+r.id).toLowerCase().indexOf(q) >= 0;
+    });
+    if(list.length){
+      list.forEach(function(r){ h += restRow(r, bi); });
+    } else if(!q){
+      h += '<div class="none">Aucun restant — tout est catalogué dans les sacs.</div>';
+    }
+    // Not in the leftovers? Then it is catalogued somewhere: say where.
+    if(q){
+      var hits = (d.parts||[]).filter(function(p){
+        return (p.name+' '+p.color+' '+p.id).toLowerCase().indexOf(q) >= 0;
+      }).slice(0, 12);
+      if(!list.length && !hits.length){
+        h += '<div class="none">Rien de ce nom dans ce set.</div>';
+      } else if(hits.length){
+        h += '<div class="none" style="padding-bottom:4px">Pas dans les restants — pièces du set :</div>';
+        hits.forEach(function(p){ h += partRow(p, bi); });
+      }
+    }
+    return h + '</div>';
+  }
+
+  /** « Fait » — the leftover is in your hand at this bag, so the PC takes it off the
+   *  inventory and puts it IN that bag, then re-plans. Dropping it from the inventory alone
+   *  would lose the pieces (no other file of the set holds them, so the CFB master would
+   *  ship short) and would leave the box question unanswered: the re-plan is what assigns
+   *  the C / D box, and its remark is what comes back here. */
+  function markDone(key){
+    var d = PANEL.data; if(!d) return;
+    var r = (d.restants||[]).filter(function(x){ return x.key===key; })[0];
+    if(!r) return;
+    var bi = bagIndexFor(PANEL.bag);
+    // No confirm dialog: the row answers for itself (⏳ then the remark the PC decided), the
+    // move is backed up, and it cannot change the piece count — a popup here was just noise.
+    PANEL.done = {key:key, status:'pending', result:''};
+    render();
+    google.script.run.withSuccessHandler(function(res){
+      if(res && res.ok){ pollCmd('restant_done', key); }
+      else { toast('Refusé : '+((res&&res.error)||'?')); PANEL.done = null; render(); }
+    }).withFailureHandler(function(e){
+      toast('Échec : '+e.message); PANEL.done = null; render();
+    }).queueCommand(PANEL.key, 'restant_done', {key:key, qty:r.qty, to_bag:bi});
+  }
+
+  // -- change phase (mirrors the desktop right-click menu) --
+  var phaseKey = null;
+  function openPhase(key){ phaseKey = key; document.getElementById('phasemodal').classList.remove('hidden'); }
+  function setPhase(phase){
+    var s = SETS.filter(function(x){return x.key===phaseKey;})[0];
+    document.getElementById('phasemodal').classList.add('hidden');
+    if(!s) return;
+    if(phase==='ouverture'){ s.done=[]; s.sorting=false; }
+    else if(phase==='trier'){ s.sorting=true; }
+    else if(phase==='trie'){ s.done=[]; for(var b=1;b<=s.bags;b++) s.done.push(b); s.sorting=true; }
+    render();
+    google.script.run.withFailureHandler(function(e){ toast('Échec : '+e.message); load(); }).setPhase(s.key, phase);
+  }
+
+  /** « Séparation terminée » — le seul geste de la phase « Séparer les sacs ».
+   *  Il n'annonce aucune phase : il note que le travail physique est fait, et la suivante
+   *  (« Cataloguer ») se déduit des fichiers, comme tout le reste. */
+  function finishSeparating(key, btn){
+    btn.disabled = true; btn.textContent = '…';
+    google.script.run.withSuccessHandler(function(r){
+      if(!r || !r.ok){
+        btn.disabled = false; btn.textContent = 'Séparation terminée';
+        toast('Refusé : ' + ((r && r.error) || '?'));
+        return;
+      }
+      toast('Sachets séparés — place au cataloguage');
+      load();
+    }).withFailureHandler(function(e){
+      btn.disabled = false; btn.textContent = 'Séparation terminée';
+      toast('Échec : ' + e.message);
+    }).finishSeparating(key);
+  }
+
+  function queueAction(key, action){
+    var s = SETS.filter(function(x){return x.key===key;})[0]; if(!s) return;
+    var label = action==='restants' ? 'Appliquer restant' : 'Construire CFB';
+    var q = action==='build_cfb'
+      ? 'Construire le fichier CFB, l\'envoyer par courriel, puis TERMINER le set ?\n\n'
+        + '• les copies sortent de l\'inventaire\n'
+        + '• le dossier part à la corbeille du PC (récupérable)\n\n'
+        + 'Rien n\'est touché si le courriel ne part pas.'
+      : 'Calculer les restants pour ce set ?';
+    if(!confirm(q+' Le PC le fera dès qu\'il tourne.')) return;
+    s.cmd = {action:action, status:'pending', result:'en attente du PC'};
+    render();
+    google.script.run.withSuccessHandler(function(r){
+      if(r && r.ok){ toast(label+' demandé ✓'); }
+      else { toast('Refusé : '+((r&&r.error)||'?')); s.cmd=null; render(); }
+    }).withFailureHandler(function(e){ toast('Échec : '+e.message); s.cmd=null; render(); }).queueCommand(key, action);
+  }
+
+  function toggleBag(key, bag){
+    var s = SETS.filter(function(x){return x.key===key;})[0]; if(!s) return;
+    var i = s.done.indexOf(bag);
+    if(i>=0) s.done.splice(i,1); else s.done.push(bag);
+    s.sorting = true;
+    render();
+    clearTimeout(saveTimers[key]);
+    saveTimers[key] = setTimeout(function(){
+      google.script.run.withFailureHandler(function(e){ toast('Échec sauvegarde : '+e.message); }).setBags(key, s.done);
+    }, 400);
+  }
+
+  function load(){
+    document.getElementById('app').innerHTML = '<div class="center">Chargement&#8230;</div>';
+    google.script.run.withSuccessHandler(function(data){
+      SETS = data.sets || [];
+      document.getElementById('asof').textContent = data.generated ? ('Mis à jour : '+data.generated.replace('T',' ')) : '';
+      render();
+    }).withFailureHandler(function(e){
+      document.getElementById('app').innerHTML = '<div class="center">Erreur : '+esc(e.message)+'<br>Vérifie CFB_FOLDER_ID.</div>';
+    }).getSets();
+  }
+
+  var modal = document.getElementById('modal');
+  /** Open the purchase sheet, optionally prefilled from a buy-list row. The PRICE is never
+   *  prefilled: the list carries the pre-tax shelf price, the Journal wants what you
+   *  actually paid, taxes included. */
+  /** Les comptes du Journal pour un numéro de set, depuis le tableau de bord : le PC les
+   *  fournit PAR COPIE (convention Journal, sans les pièces en trop — pas le compte du
+   *  classement). Cherché dans tout le classement, donc le bouton flottant en profite aussi.
+   *  {lots, pieces} par copie, ou null si le set n'est pas au classement. */
+  function journalCounts(number){
+    var b = (DASH && DASH.buy_list) || {};
+    var rows = (b.batch || []).concat(b.others || []);
+    for(var i = 0; i < rows.length; i++){
+      if(String(rows[i].number) === String(number)){
+        var l = rows[i].journal_lots, q = rows[i].journal_pieces;
+        if(l || q) return {lots: l || 0, pieces: q || 0};
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /** Le batch auquel ce set est destine : celui que l'envoi en cours cherche a completer,
+   *  que le PC nomme deja dans dashboard.json (buy_list.shipment.name). C'est la raison
+   *  d'etre de l'achat, donc c'est la valeur par defaut — modifiable si on range ailleurs. */
+  function targetBatch(){
+    var s = (DASH && DASH.buy_list && DASH.buy_list.shipment) || {};
+    return s.name ? String(s.name) : '';
+  }
+
+  function openPurchase(pre){
+    pre = pre || {};
+    document.getElementById('p_date').value = new Date().toISOString().slice(0,10);
+    var bt = document.getElementById('p_batch');
+    bt.value = targetBatch();
+    updateBatchNote();
+    if(pre.number) document.getElementById('p_num').value = pre.number;
+    if(pre.vendor) document.getElementById('p_vendor').value = pre.vendor;
+    if(pre.qty && Number(pre.qty) > 0) document.getElementById('p_qty').value = pre.qty;
+    document.getElementById('p_price').value = '';
+    modal.classList.remove('hidden');
+  }
+  /** Dire, avant de confirmer, ce que l'enregistrement va faire en plus d'ecrire au Journal. */
+  function updateBatchNote(){
+    var v = (document.getElementById('p_batch').value || '').trim();
+    document.getElementById('p_batch_note').textContent = v
+      ? 'En confirmant, le set sera automatiquement ajouté au batch ' + v
+        + ', et le PC synchronisera les achats.'
+      : "Laisse vide pour n'inscrire le set à aucun batch. Le PC synchronisera quand même "
+        + "les achats.";
+  }
+  document.getElementById('p_batch').addEventListener('input', updateBatchNote);
+  document.getElementById('fab').addEventListener('click', function(){ openPurchase(); });
+  document.getElementById('p_cancel').addEventListener('click', function(){ modal.classList.add('hidden'); });
+  document.getElementById('p_go').addEventListener('click', function(){
+    var p = {
+      number: document.getElementById('p_num').value.trim(),
+      vendor: document.getElementById('p_vendor').value.trim() || 'Amazon',
+      qty: document.getElementById('p_qty').value.trim(),
+      price: (document.getElementById('p_price').value||'').replace(',','.').replace('$','').trim(),
+      date: document.getElementById('p_date').value
+    };
+    if(!p.number || !p.qty || !p.price){ toast('Numéro, quantité et prix requis.'); return; }
+    // H Lots / I Pièces. Les LOTS ne se multiplient PAS — 9 exemplaires du même set, ce
+    // sont les mêmes lots (pièce + couleur) avec 9× la quantité dedans. Les PIÈCES, si, et
+    // par la quantité SAISIE (on peut en acheter 5 au lieu des 9 proposés), pas celle du
+    // classement. Vérifié contre les maîtres expédiés : 43011 ×9 = 219 lots / 4 788 pièces.
+    p.batch = (document.getElementById('p_batch').value || '').trim();
+    var jc = journalCounts(p.number);
+    if(jc){
+      var nq = Math.round(Number(p.qty) || 0);
+      p.lots = jc.lots;
+      p.pieces = jc.pieces * nq;
+    }
+    var go = document.getElementById('p_go'); go.disabled = true; go.textContent = '…';
+    google.script.run.withSuccessHandler(function(reply){
+      go.disabled=false; go.textContent='Enregistrer';
+      var r = null;
+      try { r = JSON.parse(String(reply)); } catch(e){ r = null; }
+      if(!r || r.ok !== true){
+        toast('Refusé : ' + ((r && r.error) || reply)); return;
+      }
+      modal.classList.add('hidden');
+      document.getElementById('p_num').value=''; document.getElementById('p_price').value='';
+      // Le batch est le second effet de l'enregistrement : il doit se dire, sinon on croit
+      // le set inscrit alors qu'il a pu être refusé (batch fermé, déjà dans un autre).
+      var msg = 'Achat enregistré au Journal ✓';
+      if(r.batch){
+        if(r.batch.ok) msg += r.batch.added ? ' · ajouté au batch ' + r.batch.name
+                                            : ' · déjà au batch ' + r.batch.name;
+        else msg += ' · ⚠ batch : ' + r.batch.error;
+      }
+      // La synchro est le troisième effet : sans elle l'achat ne descend pas dans la base
+      // du PC et « reste à investir » ne bouge pas. Un refus veut presque toujours dire
+      // qu'une synchro attend déjà — ça n'est pas une erreur, il faut le dire comme tel.
+      if(r.sync){
+        msg += r.sync.ok ? ' · synchro demandée au PC' : ' · synchro déjà en attente';
+      }
+      toast(msg);
+      if(r.sync && r.sync.ok) schedulePoll();
+      loadDash();          // the purchase moves "reste à investir" once le PC synchronise
+    }).withFailureHandler(function(e){
+      go.disabled=false; go.textContent='Enregistrer'; toast('Échec : '+e.message);
+    }).logPurchase(p);
+  });
+
+  document.getElementById('phase_cancel').addEventListener('click', function(){ document.getElementById('phasemodal').classList.add('hidden'); });
+  document.querySelectorAll('#phasemodal [data-phase]').forEach(function(b){
+    b.addEventListener('click', function(){ setPhase(b.getAttribute('data-phase')); });
+  });
+
+  document.querySelectorAll('.tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ showTab(b.getAttribute('data-tab')); });
+  });
+
+  document.getElementById('reload').addEventListener('click', function(){
+    if(TAB==='tri') load(); else loadDash();
+  });
+
+  document.title = TITLES[TAB];      // no title bar on the page: it lives in the tab/app name
+  load();
+  loadDash();
+</script>
+</body>
+</html>
