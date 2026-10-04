@@ -999,6 +999,19 @@ def apply(name, wdb=None, backup=None, log=print):
     # remonterait. À l'échelle de base, un sac à moitié saisi n'est qu'un sac à moitié
     # saisi : la passe suivante le reprend tel quel.
     done = {f: _catalogue_done(f) for f in fs}
+    # Le marqueur ×N est un commentaire XML que BrickStore retire en réenregistrant, et la
+    # divisibilité ne tient plus dès qu'un lot est rajouté à la quantité de base. On
+    # demande donc au CATALOGUE, fichier par fichier, si les quantités sont déjà à
+    # l'échelle — c'est la seule source qui ne puisse pas avoir été réécrite sous nous.
+    from . import catalogdb
+    attendu, _cat = {}, None
+    for f in fs:
+        try:
+            if _cat is None:
+                _cat = catalogdb.shared()
+            attendu[f] = verify.expected_parts(_cat, set_number(f))
+        except Exception:
+            attendu[f] = {}
     paths = [path for _l, path, _i in p["bags"] if p["remarks"].get(path)]
     backup_dir = None
     if backup and paths:
@@ -1010,8 +1023,14 @@ def apply(name, wdb=None, backup=None, log=print):
     total = 0
     for path in paths:
         mult = p["path_mult"].get(path, 1)
-        if not done.get(os.path.dirname(path), True):
+        folder = os.path.dirname(path)
+        if not done.get(folder, True):
             mult = 1                     # cataloguage en cours : remarques seules
+        elif mult > 1 and verify.file_looks_multiplied(path, attendu.get(folder) or {}, mult):
+            log("⚠ %s : déjà à l'échelle ×%d d'après le catalogue, mais son marqueur a "
+                "disparu (BrickStore l'efface en enregistrant) — NON remultiplié."
+                % (os.path.basename(path), mult))
+            mult = 1
         n, _eff, _st = bsx.write_plan(path, p["remarks"][path], multiplier=mult)
         total += n
 

@@ -141,6 +141,40 @@ def _catalogue_unfinished(folder):
         return False
 
 
+def file_looks_multiplied(path, expected, multiplier):
+    """Ce fichier porte-t-il deja des quantites xN, bien qu'il n'ait plus de marqueur ?
+
+    Le marqueur `MLJQ-xN` est un commentaire XML, et **BrickStore le retire en
+    reenregistrant** — constate sur 11381 : deux sacs multiplies le 03-10 a 14:27 l'avaient
+    perdu apres une sauvegarde le 04-10. Il ne reste alors que la divisibilite, et elle
+    tombe des qu'UN lot est ajoute a la quantite de base : le fichier repasse pour « base »
+    et un Apply le multiplierait une seconde fois. Sur un sac de 790 pieces, c'est 7 900 qui
+    partiraient chez le client, sans un mot.
+
+    On tranche donc sur le CATALOGUE, qui lui ne ment pas : pour chaque lot qu'on sait
+    rattacher, sa quantite vaut-elle la quantite de base du set, ou N fois cette
+    quantite ? Un lot eclate entre deux sacs ne vaut ni l'une ni l'autre — il ne compte pas,
+    et c'est tant mieux : on ne veut que les temoins surs. `expected` est ce que rend
+    `expected_parts`."""
+    if not multiplier or multiplier <= 1:
+        return False
+    base = mult = 0
+    try:
+        items = bsx.read_items(path)
+    except Exception:
+        return False
+    for it in items:
+        exp = expected.get(_key(it["item_type"], it["item_id"], it["color_id"]))
+        if not exp:
+            continue
+        want = exp[0]
+        if it["qty"] == want:
+            base += 1
+        elif it["qty"] == want * multiplier:
+            mult += 1
+    return mult > base
+
+
 def normalize_inventory(folder, multiplier, log=None, force=False):
     """Bring the leftovers Inventory file up to the bags' physical scale (xN).
 

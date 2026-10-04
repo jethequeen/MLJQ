@@ -1294,11 +1294,21 @@
          : '<div class="verdict wait">⏳ Le PC place le restant dans le sac '+PANEL.bag+'…</div>';
     }
     var q = (PANEL.q||'').trim().toLowerCase();
-    var list = (d.restants||[]).filter(function(r){
+    // Cataloguage en cours : l'inventaire n'est pas une liste de restants, c'est ce qui
+    // reste a saisir. On ne le DEROULE donc pas — des centaines de lots qu'on n'a pas en
+    // main — mais la recherche y va pleinement : c'est par la qu'on rattrape une erreur,
+    // en retrouvant une piece mal saisie pour la placer dans le sac ou on est.
+    var listeFermee = !!d.cataloguing && !q;
+    var list = listeFermee ? [] : (d.restants||[]).filter(function(r){
       return !q || (r.name+' '+r.color+' '+r.id).toLowerCase().indexOf(q) >= 0;
     });
     if(list.length){
       list.forEach(function(r){ h += restRow(r, bi); });
+    } else if(listeFermee){
+      h += '<div class="none">Cataloguage en cours &#8212; '
+         + (d.restants||[]).length + ' lot'+((d.restants||[]).length>1?'s':'')
+         + ' pas encore saisi'+((d.restants||[]).length>1?'s':'')+'.<br>'
+         + 'Cherche une pièce ci-dessus pour la placer dans ce sac.</div>';
     } else if(!q){
       h += '<div class="none">Aucun restant — tout est catalogué dans les sacs.</div>';
     }
@@ -1310,7 +1320,9 @@
       if(!list.length && !hits.length){
         h += '<div class="none">Rien de ce nom dans ce set.</div>';
       } else if(hits.length){
-        h += '<div class="none" style="padding-bottom:4px">Pas dans les restants — pièces du set :</div>';
+        h += '<div class="none" style="padding-bottom:4px">'
+           + (d.cataloguing ? 'Déjà catalogué — pièces du set :'
+                            : 'Pas dans les restants — pièces du set :') + '</div>';
         hits.forEach(function(p){ h += partRow(p, bi); });
       }
     }

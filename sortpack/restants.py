@@ -239,10 +239,12 @@ def bag_help(set_folder, wdb=None, plan=None, cat=None, include_catalog=None):
         return plan_bbin.get(m) if plan_needs_d.get(m) else None
 
     # Cataloguage pas fini : le fichier d'inventaire n'est PAS une liste de restants, c'est
-    # ce qui reste a cataloguer — les pieces sont encore dans leurs sachets d'origine. Les
-    # proposer au telephone ferait placer dans un Sac des pieces qu'on n'a pas en main, et
-    # « Fait » les sortirait d'un inventaire qui sert encore de plan de travail. On les tait
-    # donc, sans les declarer absentes pour autant (voir `held` plus bas).
+    # ce qui reste a cataloguer. On le DIT au telephone (`cataloguing`), qui n'en deroule
+    # alors pas la liste entiere — plusieurs centaines de lots qu'on n'a pas en main n'ont
+    # rien d'une liste de choses a faire. Mais on l'envoie quand meme en entier, parce que
+    # c'est par la qu'on RATTRAPE une erreur : une piece mal saisie se retrouve, se cherche
+    # et se place dans le sac ou on est, exactement comme un vrai restant. La vider ici
+    # rendait ces lots introuvables — ni dans les restants, ni dans la recherche.
     cataloguing = not _catalogue_done(set_folder)
 
     restants = []
@@ -261,8 +263,6 @@ def bag_help(set_folder, wdb=None, plan=None, cat=None, include_catalog=None):
         for it in bsx.read_items(inv_path):
             k = _part_key(it)
             inv_keys.add(f'{it["item_id"]}|{it["color_id"]}|{it["condition"]}')
-            if cataloguing:
-                continue
             restants.append({
                 "key": f'{it["item_id"]}|{it["color_id"]}|{it["condition"]}',
                 "id": it["item_id"], "color": it["color_name"],
