@@ -830,7 +830,14 @@
     if(s.batch_open) return {label:'En attente de fermeture', cls:'amber', chips:false};
     if(!s.bags) return {label:'Cataloguer', cls:'gray', chips:false};
     var d = s.done.length;
-    if(d >= s.bags && s.bags > 0 && !s.cataloguing && s.batch){
+    // Un set encore en cataloguage n'est JAMAIS « Trié », ni « en attente du reste » :
+    // d'autres sacs vont naitre, et la coche verte voudrait dire « plus rien a faire »
+    // sur une boite a moitie videe. Cette ligne doit passer AVANT les deux branches qui
+    // suivent — sinon « 3 sacs coches sur les 3 faits » se lit « Trie ✓ » alors qu'il en
+    // reste neuf a saisir. Meme regle qu'au bureau (gui.status_for).
+    if(s.cataloguing) return {label:'Trier ('+d+'/'+s.bags+') · cataloguage en cours',
+                              cls:'orange', chips:true};
+    if(d >= s.bags && s.bags > 0 && s.batch){
       // Trie, mais son envoi ne l'est pas : plus rien a faire ici, et il ne part pas pour
       // autant — le maitre couvre tout l'envoi. « Trie ✓ » se lirait « pret a expedier ».
       // Meme regle qu'au bureau (gui.status_for / batch.rest_pending).
@@ -838,11 +845,10 @@
         return x.batch === s.batch && x.key !== s.key
             && (x.cataloguing || !(x.bags > 0 && x.done.length >= x.bags)); });
       if(rest.length)
-        return {label:'En attente du reste du batch', cls:'amber', chips:true};
+        return {label:'En attente du reste du batch ('+d+'/'+s.bags+')',
+                cls:'amber', chips:true};
     }
     if(d >= s.bags) return {label:'Trié ✓ ('+d+'/'+s.bags+')', cls:'green', chips:true};
-    if(s.cataloguing) return {label:'Trier ('+d+'/'+s.bags+') · cataloguage en cours',
-                              cls:'orange', chips:true};
     return {label:'Trier ('+d+'/'+s.bags+')', cls:'orange', chips:true};
   }
 
