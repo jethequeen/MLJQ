@@ -402,6 +402,45 @@ as fresh as the PC's last pass, and the tab shows that timestamp. A purchase log
 phone lands in the Journal immediately, but moves *reste à investir* only once
 **Synchroniser les achats** has run.
 
+### Déployer l'app téléphone
+
+**Le piège, et il a déjà coûté deux fausses dettes de « redéploiement dû » :** un web app
+Apps Script sert la **version déployée**, pas le HEAD de l'éditeur. Du code collé dans
+l'éditeur ne change RIEN tant qu'une nouvelle version n'est pas créée *et* le déploiement
+pointé dessus. Donc « le téléphone affiche les vieux libellés » a deux causes possibles — le
+code manque, ou la version n'a pas été refaite — et elles ne se réparent pas pareil. On ne
+devine pas : on tire et on compare.
+
+Le projet est piloté par [`clasp`](https://github.com/google/clasp) (installé globalement,
+`npm i -g @google/clasp`). Projet **MLJQ Sort & Pack**, script id
+`1pt9w4nACMdR3F6oVI4qMbg_7tGdrFBWWUPSEOtoyY2cQnlXHxARK53aS`, dont les fichiers
+correspondent un à un à ceux d'`appscript/` :
+
+| dans Apps Script | ici |
+|---|---|
+| `Code.js` | `appscript/SortPack_mobile.gs` |
+| `page.html` | `appscript/SortPack_mobile_page.html` |
+| `Livraisons.js` | `appscript/SortPack_deliveries.gs` |
+
+**Répondre à « est-ce que c'est en ligne ? »** — `clasp list-deployments` donne le numéro de
+version servi, puis on tire CETTE version dans un dossier jetable et on la compare :
+
+```bash
+clasp pull --versionNumber 20 && diff Code.js "…/appscript/SortPack_mobile.gs"
+```
+
+**Pousser.** `clasp push` écrase le projet distant avec les fichiers locaux — donc on tire
+d'abord, on compare, et seulement ensuite on pousse. Puis `clasp redeploy <deploymentId>`
+sur le déploiement **existant** : il crée la version et l'y pointe. Il y a deux
+déploiements, et la distinction compte — l'un est `@HEAD` (l'URL `/dev`, de test), l'autre
+est le vrai web app, **celui qui est sur l'écran d'accueil du téléphone**. Un *nouveau*
+déploiement donnerait une *nouvelle* URL `/exec` et tuerait le raccourci : on met toujours à
+jour, on ne recrée jamais.
+
+`CFB_email.gs` **n'est dans aucun projet listé** : il est lié au classeur Inventaire
+(container-bound), donc `clasp list-scripts` ne le voit pas. On l'ouvre depuis la feuille,
+*Extensions ▸ Apps Script*.
+
 ## Terminer un set depuis le téléphone
 
 **Construire CFB** on the phone now finishes the set, the way the desktop's
