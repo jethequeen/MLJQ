@@ -63,6 +63,17 @@
   .cmd{ font-size:12px; margin-top:9px; font-weight:600; }
   .cmd.pending{ color:var(--orange); } .cmd.running{ color:var(--blue); }
   .cmd.done{ color:var(--green); } .cmd.error{ color:#dc2626; }
+  /* Le rapport de verification arrive en lignes prefixees par le PC, et c'est le PREFIXE
+     qui porte le sens : on le colore plutot que de rejouer la logique ici. */
+  .rep{ font-size:12px; line-height:1.4; font-weight:500; margin:3px 0; }
+  .rep.bad{ color:#dc2626; font-weight:650; }
+  .rep.warn{ color:var(--orange); }
+  .rep.good{ color:var(--green); font-weight:650; }
+  .thumbs{ display:flex; gap:5px; flex-wrap:wrap; margin-top:10px; }
+  .thumbs img{ width:36px; height:36px; object-fit:contain; flex:none; border-radius:5px; }
+  .ebar{ width:100%; font-size:16px; padding:10px 12px; margin-top:11px;
+         border:1px solid var(--line); border-radius:10px; background:var(--bg);
+         color:var(--ink); -webkit-appearance:none; }
   .fab{ position:fixed; right:16px; bottom:calc(76px + env(safe-area-inset-bottom)); z-index:6;
         background:var(--accent); color:#fff; border:0; border-radius:999px; font-size:16px;
         font-weight:650; padding:14px 20px; box-shadow:0 6px 18px rgba(0,0,0,.28); }
@@ -266,6 +277,13 @@
 
 <script>
   var SETS = [];
+  var BATCHES = [];
+  // Ou on est dans l'onglet Tri : null = la liste des ENVOIS, sinon le nom de l'envoi
+  // ouvert ('' = le groupe « Hors envoi »). C'est l'envoi qui part en un seul maitre,
+  // donc c'est lui le niveau superieur, pas le set.
+  var NAV = {batch:null};
+  // L'index de recherche de l'envoi ouvert. `batch` dit pour QUEL envoi `data` vaut.
+  var SEARCH = {batch:null, q:'', data:null, loading:false, err:null};
   var saveTimers = {};
   // Set cards start collapsed: on a phone the list is for FINDING the set you are on,
   // and nine bag chips per set pushed everything else off screen. Tap a card to open it.
@@ -864,8 +882,15 @@
   function render(){
     var app = document.getElementById('app');
     if(!SETS.length){ app.innerHTML = '<div class="center">Aucun set en cours.</div>'; return; }
-    var html = '';
-    SETS.forEach(function(s){
+    // Deux niveaux : les ENVOIS, puis les sets de celui qu'on ouvre. C'est l'envoi qui
+    // part en un seul maitre et a son echelle qu'on cherche une piece — la liste plate de
+    // sets noyait les deux.
+    if(NAV.batch === null){ renderEnvois(app); return; }
+    renderEnvoi(app, NAV.batch);
+  }
+
+  function setCardHtml(s){
+      var html = '';
       var st = statusOf(s);
       html += '<div class="card" data-key="'+esc(s.key)+'">';
       var opened = !!OPEN[s.key];
@@ -922,14 +947,14 @@
             return x.cataloguing || !(x.bags>0 && x.done.length>=x.bags); });
           html += '<div class="gate">'
                + (allSorted ? '✓ Ce set est trié. ' : '')
-               + 'Envoi &laquo;&nbsp;'+esc(s.batch)+'&nbsp;&raquo; &#8212; le maître se construit '
-               + 'pour tout l&#39;envoi, sur le PC.';
+               + 'Le ma&#238;tre couvre tout l&#39;envoi &#8212; il se construit en haut de '
+               + 'cette page, pas set par set.';
           if(left.length){
             html += '<br>Reste &#224; finir : '
                  + left.map(function(x){ return esc(x.number || x.name); }).join(', ') + '.';
           } else {
-            html += '<br>Tout l&#39;envoi est tri&#233; : lance &laquo;&nbsp;Construire le CFB '
-                 + 'du batch&nbsp;&raquo; sur le PC.';
+            html += '<br>Tout l&#39;envoi est tri&#233; : &laquo;&nbsp;V&#233;rifier '
+                 + 'l&#39;envoi&nbsp;&raquo;, puis &laquo;&nbsp;Construire le CFB&nbsp;&raquo;.';
           }
           html += '</div>';
         } else {
@@ -947,11 +972,15 @@
         html += '<div class="cmd '+s.cmd.status+'">'+ic+' '+an+' &#8212; '+esc(s.cmd.result || s.cmd.status)+'</div>';
       }
       html += '</div>';
-    });
-    app.innerHTML = html;
-    syncFab();
+      return html;
+  }
+
+  function wireCards(app){
     app.querySelectorAll('.card').forEach(function(card){
       var key = card.getAttribute('data-key');
+      // Les cartes de resultat de recherche portent la meme classe sans data-key : rien
+      // a brancher dessus, et `.pill` y aurait ouvert le selecteur de phase d'un set nul.
+      if(!key) return;
       card.querySelectorAll('.bag').forEach(function(btn){
         btn.addEventListener('click', function(){ toggleBag(key, parseInt(btn.getAttribute('data-bag'),10)); });
       });
@@ -1022,6 +1051,328 @@
         render();
       });
     });
+  }
+
+  // ── Niveau 1 : les ENVOIS ───────────────────────────────────────────────────
+  // Un envoi part en UN maitre, se trie en UNE sequence de Sacs et se cherche d'un bloc.
+  // C'est donc lui qu'on voit d'abord ; les sets ne sont qu'un detail de son contenu.
+
+  function envoiBrief(mine){
+    var o = {n:mine.length, bags:0, done:0, cat:0, ready:0, sorted:0};
+    mine.forEach(function(s){
+      o.bags += (s.bags || 0);
+      o.done += (s.done || []).length;
+      if(s.cataloguing) o.cat++;
+      if(s.phase === 'Prêt pour livraison') o.ready++;
+      if(!s.cataloguing && s.bags > 0 && (s.done || []).length >= s.bags) o.sorted++;
+    });
+    return o;
+  }
+
+  /** La pastille de l'envoi : l'etat du LOT, pas d'un set. Memes regles que statusOf et
+   *  dans le meme ordre — ce qui est emballe passe avant l'avancement du tri, et un envoi
+   *  encore ouvert ne se trie pas (sa numerotation de Sacs peut bouger). */
+  function envoiPill(b, o){
+    if(o.n && o.ready === o.n) return {label:'Prêt pour livraison', cls:'purple'};
+    if(b && !b.closed) return {label:'Ouvert — ' + o.n + ' set' + (o.n > 1 ? 's' : ''),
+                               cls:'amber'};
+    if(o.cat) return {label:'Cataloguer (' + o.done + '/' + o.bags + ')', cls:'orange'};
+    if(o.bags && o.done >= o.bags) return {label:'Tout trié ✓', cls:'green'};
+    return {label:'Trier (' + o.done + '/' + o.bags + ')', cls:'orange'};
+  }
+
+  function renderEnvois(app){
+    var html = '', seen = {};
+    BATCHES.forEach(function(b){
+      var mine = SETS.filter(function(s){ return s.batch === b.name; });
+      mine.forEach(function(s){ seen[s.key] = 1; });
+      var o = envoiBrief(mine), st = envoiPill(b, o);
+      html += '<div class="card">';
+      html += '<div class="row1 tap" data-envoi="' + esc(b.name) + '">';
+      html += '<div class="name">Envoi &laquo;&nbsp;' + esc(b.name) + '&nbsp;&raquo;'
+            + '<div class="sub">' + o.n + ' set' + (o.n > 1 ? 's' : '')
+            + ' &#183; ' + o.done + '/' + o.bags + ' sacs cochés</div></div>';
+      html += '<span class="pill ' + st.cls + '">' + esc(st.label) + '</span>';
+      html += '<span class="caret">&#8250;</span></div>';
+      if(mine.length){
+        html += '<div class="thumbs">';
+        mine.forEach(function(s){
+          html += '<img src="' + imgUrl(s.number)
+                + '" onerror="this.style.visibility=&quot;hidden&quot;">';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    // Les sets hors envoi gardent leur place : ils se traitent set par set, comme avant.
+    var loose = SETS.filter(function(s){ return !seen[s.key]; });
+    if(loose.length){
+      var lo = envoiBrief(loose);
+      html += '<div class="card"><div class="row1 tap" data-envoi="">';
+      html += '<div class="name">Hors envoi<div class="sub">' + loose.length + ' set'
+            + (loose.length > 1 ? 's' : '') + ' hors lot</div></div>';
+      html += '<span class="pill gray">' + lo.done + '/' + lo.bags + '</span>';
+      html += '<span class="caret">&#8250;</span></div></div>';
+    }
+    app.innerHTML = html || '<div class="center">Aucun envoi.</div>';
+    syncFab();
+    app.querySelectorAll('[data-envoi]').forEach(function(el){
+      el.addEventListener('click', function(){
+        NAV.batch = el.getAttribute('data-envoi');
+        SEARCH = {batch:null, q:'', data:null, loading:false, err:null};
+        window.scrollTo(0, 0);
+        render();
+      });
+    });
+  }
+
+  // ── Niveau 2 : un envoi ─────────────────────────────────────────────────────
+
+  /** Le bouton « Construire » ne s'ouvre qu'apres un « Verifier » VERT. La chaine testee
+   *  est un CONTRAT avec le PC (remote._do_batch_check) : si elle change la-bas, elle doit
+   *  changer ici. Un faux positif ne casse rien — le PC rejoue la verification avant de
+   *  construire, et refuse (remote._do_batch_cfb). */
+  var CHECK_OK = '✔ Tout est beau';
+  function checkIsGreen(b){
+    var c = (b.cmds || {})['batch_check'];
+    return !!(c && c.status === 'done' && String(c.result || '').indexOf(CHECK_OK) >= 0);
+  }
+
+  /** Le rapport arrive en lignes prefixees par le PC, et c'est le PREFIXE qui porte le
+   *  sens : ⛔ une action de toi, ⚙ ce que la construction corrigera seule, ✔ tout va bien.
+   *  On colore le prefixe plutot que de rejouer la logique ici. */
+  function reportHtml(txt){
+    return String(txt == null ? '' : txt).split('\n').map(function(l){
+      var cls = l.indexOf('⛔') === 0 ? 'bad'
+              : (l.indexOf('⚙') === 0 ? 'warn'
+              : (l.indexOf('✔') === 0 ? 'good' : ''));
+      return '<div class="rep ' + cls + '">' + esc(l) + '</div>';
+    }).join('');
+  }
+
+  function batchCmdHtml(b){
+    var out = '';
+    [['batch_check', "Vérifier l'envoi"], ['batch_cfb', 'Construire le CFB']]
+      .forEach(function(p){
+        var cur = JOBQ['b:' + b.name + ':' + p[0]] || (b.cmds || {})[p[0]];
+        if(!cur) return;
+        var ic = {pending:'⏳', running:'⚙', done:'✓', error:'⚠'}[cur.status] || '';
+        out += '<div class="cmd ' + cur.status + '">' + ic + ' ' + esc(p[1]) + '</div>'
+             + reportHtml(cur.result || cur.status);
+      });
+    return out;
+  }
+
+  function envoiHeadHtml(name, b, mine){
+    var o = envoiBrief(mine), st = b ? envoiPill(b, o) : {label:'', cls:''};
+    var html = '<div class="card" data-head="1">';
+    html += '<div class="row1"><button class="mini" data-back="1">&#8249; Envois</button>';
+    html += '<div class="name">'
+          + (name ? 'Envoi &laquo;&nbsp;' + esc(name) + '&nbsp;&raquo;' : 'Hors envoi')
+          + '<div class="sub">' + o.n + ' set' + (o.n > 1 ? 's' : '')
+          + ' &#183; ' + o.done + '/' + o.bags + ' sacs cochés</div></div>';
+    if(b) html += '<span class="pill ' + st.cls + '">' + esc(st.label) + '</span>';
+    html += '</div>';
+    // La recherche GLOBALE : une piece en main, dans quel Sac va-t-elle ?
+    html += '<input id="envq" class="ebar" type="search" inputmode="search" '
+          + 'placeholder="Chercher une pièce dans tout l&#39;envoi&#8230;" value="'
+          + esc(SEARCH.q) + '">';
+    if(name && b){
+      var ok = checkIsGreen(b);
+      html += '<div class="acts">'
+            + '<button class="act" data-bact="batch_check">Vérifier l&#39;envoi</button>'
+            + '<button class="act solid' + (ok ? '' : ' off') + '" data-bact="batch_cfb"'
+            + (ok ? '' : ' disabled') + '>Construire le CFB</button></div>';
+      if(!ok){
+        html += '<div class="gate">Lance &laquo;&nbsp;V&#233;rifier&nbsp;&raquo; : si tout '
+             + 'est beau la construction s&#39;ouvre, sinon il dira quoi r&#233;gler.</div>';
+      }
+      html += batchCmdHtml(b);
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderEnvoi(app, name){
+    var mine = name ? SETS.filter(function(s){ return s.batch === name; })
+                    : SETS.filter(function(s){ return !s.batch; });
+    var b = BATCHES.filter(function(x){ return x.name === name; })[0] || null;
+    // L'envoi a disparu sous nos pieds (solde sur le PC) : on remonte plutot que d'afficher
+    // une page vide dont on ne peut plus sortir.
+    if(name && !b && !mine.length){ NAV.batch = null; render(); return; }
+
+    var html = envoiHeadHtml(name, b, mine);
+    if(String(SEARCH.q || '').trim()){
+      html += searchHtml(name, mine);
+    } else {
+      mine.forEach(function(s){ html += setCardHtml(s); });
+    }
+    app.innerHTML = html;
+    syncFab();
+
+    var back = app.querySelector('[data-back]');
+    if(back) back.addEventListener('click', function(){
+      NAV.batch = null;
+      window.scrollTo(0, 0);
+      render();
+    });
+    app.querySelectorAll('[data-bact]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        queueBatchAction(name, btn.getAttribute('data-bact'));
+      });
+    });
+    var q = app.querySelector('#envq');
+    if(q){
+      q.addEventListener('input', function(){
+        SEARCH.q = q.value;
+        clearTimeout(q._t);
+        q._t = setTimeout(function(){
+          var at = q.selectionStart;
+          render();
+          var nq = document.getElementById('envq');
+          if(nq){ nq.focus(); try{ nq.setSelectionRange(at, at); }catch(e){} }
+        }, 250);
+      });
+    }
+    wireCards(app);
+  }
+
+  function queueBatchAction(name, action){
+    var k = 'b:' + name + ':' + action;
+    JOBQ[k] = {status:'pending', result:''};
+    render();
+    google.script.run.withSuccessHandler(function(r){
+      if(r && r.ok){
+        toast(action === 'batch_check' ? 'Vérification demandée' : 'Construction demandée');
+        scheduleBatchPoll();
+      } else {
+        toast('Refusé : ' + ((r && r.error) || '?'));
+        delete JOBQ[k];
+      }
+      render();
+    }).withFailureHandler(function(e){
+      toast('Échec : ' + e.message);
+      delete JOBQ[k];
+      render();
+    }).queueCommand('', action, {batch:name});
+  }
+
+  /** Une demande d'envoi tourne sur le PC : on relit la file jusqu'a ce qu'elle reponde,
+   *  et SILENCIEUSEMENT (load(true)) pour ne pas effacer le rapport sous les yeux. */
+  var bpoll = null;
+  function scheduleBatchPoll(){
+    if(bpoll) return;
+    bpoll = setInterval(function(){
+      var waiting = Object.keys(JOBQ).some(function(k){ return k.indexOf('b:') === 0; })
+        || BATCHES.some(function(b){
+             return ['batch_check', 'batch_cfb'].some(function(a){
+               var c = (b.cmds || {})[a];
+               return c && (c.status === 'pending' || c.status === 'running');
+             });
+           });
+      if(!waiting){ clearInterval(bpoll); bpoll = null; return; }
+      load(true);
+    }, 6000);
+  }
+
+  // ── La recherche globale de l'envoi ─────────────────────────────────────────
+  // « J'ai cette piece en main : dans quel Sac va-t-elle ? » — a l'echelle de l'envoi.
+  //
+  // AUCUNE nouvelle donnee cote PC : restants_<set>.json porte deja l'index de TOUT
+  // l'envoi, parce que le plan d'un set de batch planifie l'envoi entier (bag_help). Donc
+  // n'importe lequel de ses sets repond pour tous. On le charge UNE fois, puis on filtre en
+  // memoire — c'est ce qui rend la frappe instantanee.
+
+  function fold(s){
+    s = String(s == null ? '' : s).toLowerCase();
+    try { s = s.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch(e){}
+    return s;
+  }
+
+  function loadSearch(name, mine){
+    if(SEARCH.batch === name && (SEARCH.data || SEARCH.loading || SEARCH.err)) return;
+    var any = mine.filter(function(s){ return s.number; })[0];
+    if(!any){ SEARCH.batch = name; SEARCH.err = 'aucun set dans cet envoi'; return; }
+    SEARCH.batch = name; SEARCH.loading = true; SEARCH.data = null; SEARCH.err = null;
+    google.script.run.withSuccessHandler(function(d){
+      if(SEARCH.batch !== name) return;
+      SEARCH.loading = false;
+      if(d && d.ok) SEARCH.data = d;
+      else SEARCH.err = (d && d.error) || 'index indisponible';
+      render();
+    }).withFailureHandler(function(e){
+      if(SEARCH.batch !== name) return;
+      SEARCH.loading = false; SEARCH.err = e.message; render();
+    }).getRestants(any.number);
+  }
+
+  /** « 11503 sac 3 · 11381 sac 12 » — ou la piece se trouve ENCORE, en numeros de sac du
+   *  set qui la detient. Les indices pointent dans la marche de l'ENVOI, dont chaque pas
+   *  porte son proprietaire (bag_owner) et son etiquette (bags) ; « 7 » et « 7 - 1 » sont
+   *  le meme sac physique 7, donc on dedoublonne sur le numero. */
+  function whereHtml(idxs){
+    var d = SEARCH.data || {}, labels = d.bags || [], own = d.bag_owner || [];
+    var seen = {}, out = [];
+    (idxs || []).forEach(function(i){
+      var lab = String(labels[i] == null ? '' : labels[i]);
+      var m = lab.match(/^\s*(\d+)/);
+      var n = m ? m[1] : lab;
+      var o = String(own[i] == null ? '' : own[i]);
+      var k = o + '/' + n;
+      if(seen[k]) return;
+      seen[k] = 1;
+      out.push(esc(o) + ' sac ' + esc(n));
+    });
+    return out.join(' &#183; ');
+  }
+
+  function searchHtml(name, mine){
+    if(!SEARCH.data && !SEARCH.err) loadSearch(name, mine);
+    if(SEARCH.loading) return '<div class="center">Chargement de l&#39;index de l&#39;envoi&#8230;</div>';
+    if(SEARCH.err) return '<div class="center">Index indisponible : ' + esc(SEARCH.err)
+                        + '<br>Il est &#233;crit quand le PC pose les remarques.</div>';
+    if(!SEARCH.data) return '<div class="center">Chargement&#8230;</div>';
+
+    var q = fold(SEARCH.q).trim();
+    if(q.length < 2){
+      return '<div class="hint">Tape au moins 2 caract&#232;res &#8212; num&#233;ro de '
+           + 'pi&#232;ce, nom ou couleur.</div>';
+    }
+    var hits = (SEARCH.data.parts || []).filter(function(p){
+      return fold(p.id).indexOf(q) >= 0 || fold(p.name).indexOf(q) >= 0
+          || fold(p.color).indexOf(q) >= 0;
+    });
+    // Le numero de piece d'abord : c'est ce qui est moule sur la brique, donc ce qu'on tape.
+    hits.sort(function(x, y){
+      var a = fold(x.id).indexOf(q) === 0 ? 0 : 1, b = fold(y.id).indexOf(q) === 0 ? 0 : 1;
+      if(a !== b) return a - b;
+      return String(x.id).localeCompare(String(y.id));
+    });
+    if(!hits.length){
+      return '<div class="hint">Aucune pi&#232;ce de cet envoi ne correspond.</div>';
+    }
+    var cap = 40, html = '';
+    html += '<div class="hint">' + hits.length + ' pi&#232;ce' + (hits.length > 1 ? 's' : '')
+          + (hits.length > cap ? ' &#8212; les ' + cap + ' premi&#232;res' : '') + '.</div>';
+    hits.slice(0, cap).forEach(function(p){
+      var sac = (p.sac === null || p.sac === undefined || p.sac === '') ? null : p.sac;
+      var w = whereHtml(p.bags);
+      html += '<div class="rest">';
+      html += '<div class="rl">' + imgTag(p, 'pimg') + '<div class="rn">' + esc(p.name || '')
+            + '<br><i>' + esc(p.color || '?') + ' &#183; ' + esc(p.id) + '</i></div>';
+      html += '<div class="rq">&#215;' + (p.qty || 0) + '</div></div>';
+      html += '<div class="verdict ' + (sac !== null ? 'go' : 'wait') + '">'
+            + (sac !== null ? '<b>&#10145; Sac ' + pad2(sac) + '</b>'
+                            : 'Aucun Sac assign&#233;')
+            + (w ? '<br>Encore dans : ' + w : '<br>Plus dans aucun sac')
+            + (p.cbin ? '<br>En attente en <b>' + esc(boxName('C', p.cbin)) + '</b>' : '')
+            + (p.dbin ? '<br>Couleurs s&#339;urs : <b>' + esc(boxName('D', p.dbin))
+                      + '</b>' : '')
+            + (p.absent ? '<br><b>Absente des fichiers</b> &#8212; lot supprim&#233;' : '')
+            + '</div>';
+      html += '</div>';
+    });
+    return html;
   }
 
   // ── Sorting panel: « je suis au sac N et j'ai cette pièce en main » ─────────
@@ -1420,10 +1771,19 @@
     }, 400);
   }
 
-  function load(){
-    document.getElementById('app').innerHTML = '<div class="center">Chargement&#8230;</div>';
+  function load(quiet){
+    // `quiet` : le rechargement qui suit une demande d'envoi ne doit pas faire clignoter
+    // « Chargement… » par-dessus le rapport qu'on est en train de lire.
+    if(!quiet) document.getElementById('app').innerHTML = '<div class="center">Chargement&#8230;</div>';
     google.script.run.withSuccessHandler(function(data){
       SETS = data.sets || [];
+      BATCHES = data.batches || [];
+      // L'etat optimiste n'a plus lieu d'etre des que la vraie commande est dans la file.
+      BATCHES.forEach(function(b){
+        ['batch_check','batch_cfb'].forEach(function(a){
+          if((b.cmds || {})[a]) delete JOBQ['b:'+b.name+':'+a];
+        });
+      });
       document.getElementById('asof').textContent = data.generated ? ('Mis à jour : '+data.generated.replace('T',' ')) : '';
       render();
     }).withFailureHandler(function(e){

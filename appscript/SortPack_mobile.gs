@@ -45,6 +45,9 @@ var SET_ACTIONS = ['restants', 'build_cfb', 'restant_done', 'restant_move'];
 var BAG_HELP_FILE = 'restants_{set}.json';   // per-set, written by the PC at Apply
 var GLOBAL_ACTIONS = ['sync_purchases', 'buy_report', 'cfb_inventory', 'end_of_month',
                       'check_cookies'];
+// Portee ENVOI : ni un set (pas de dossier) ni un job global (il faut savoir lequel). Le
+// nom de l'envoi voyage dans payload.batch, et le PC le lit la (sortpack/remote.py).
+var BATCH_ACTIONS = ['batch_check', 'batch_cfb'];
 
 
 function doGet() {
@@ -116,7 +119,25 @@ function getSets() {
     if (c) row.cmd = { action: c.action, status: c.status, result: c.result || '' };
     return row;
   });
-  return { generated: idx.generated || '', sets: out };
+  // Les ENVOIS, pour que l'onglet Tri s'ouvre dessus plutot que sur une liste plate de
+  // sets. On renvoie le registre (ecrit aussi par le PC) et, par envoi, la DERNIERE demande
+  // de chaque action d'envoi : « Verifier » doit pouvoir afficher son rapport, et
+  // « Construire » son resultat, sans que la page ait a fouiller la file.
+  var reg = readJson_(BATCH_FILE) || {};
+  var bcmd = {};
+  cmds.forEach(function (c) {                          // chronologique → le dernier gagne
+    if (BATCH_ACTIONS.indexOf(c.action) < 0) return;
+    var n = String((c.payload && c.payload.batch) || '');
+    if (!n) return;
+    if (!bcmd[n]) bcmd[n] = {};
+    bcmd[n][c.action] = { action: c.action, status: c.status, result: c.result || '',
+                          created: c.created || '', finished: c.finished || '' };
+  });
+  var batches = Object.keys(reg).sort().map(function (n) {
+    return { name: n, closed: !!reg[n].closed, created: reg[n].created || '',
+             sets: (reg[n].sets || []).map(String), cmds: bcmd[n] || {} };
+  });
+  return { generated: idx.generated || '', sets: out, batches: batches };
 }
 
 /** Queue a step for the PC to run: a per-set one ('restants' / 'build_cfb') or a global job
@@ -125,18 +146,27 @@ function getSets() {
  *  (Writing the remarks is automatic on the PC once cataloguing is done — no command.) */
 function queueCommand(key, action, payload) {
   var isGlobal = GLOBAL_ACTIONS.indexOf(action) >= 0;
-  if (!isGlobal && SET_ACTIONS.indexOf(action) < 0) return { ok: false, error: 'action invalide' };
+  var isBatch = BATCH_ACTIONS.indexOf(action) >= 0;
+  if (!isGlobal && !isBatch && SET_ACTIONS.indexOf(action) < 0) {
+    return { ok: false, error: 'action invalide' };
+  }
+  // Une action d'envoi sans nom d'envoi n'a aucun sens, et le PC la refuserait APRES coup.
+  var bname = isBatch ? String((payload && payload.batch) || '').trim() : '';
+  if (isBatch && !bname) return { ok: false, error: 'envoi manquant' };
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
     var idx = readJson_(INDEX_FILE) || { sets: [] };
     var meta = (idx.sets || []).filter(function (s) { return s.key === key; })[0] || { key: key };
     var data = readJson_(COMMANDS_FILE) || { commands: [] };
-    if (isGlobal) {
+    if (isGlobal || isBatch) {
       key = '';
       meta = { key: '', number: '', name: '' };
+      // Pas deux fois la meme demande en attente. Pour un envoi, la dedupe est PAR ENVOI :
+      // verifier l'envoi 1 ne doit pas empecher de verifier l'envoi 2.
       var waiting = (data.commands || []).filter(function (c) {
-        return c.action === action && (c.status === 'pending' || c.status === 'running');
+        return c.action === action && (c.status === 'pending' || c.status === 'running')
+          && (!isBatch || String((c.payload && c.payload.batch) || '') === bname);
       });
       if (waiting.length) return { ok: false, error: "déjà demandé — le PC ne l'a pas encore fait" };
     }
