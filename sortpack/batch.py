@@ -1433,6 +1433,13 @@ def preflight(name, cat=None):
                        else f"{n} lot(s) en écart — {gap} pièce(s)")
             if rep["can_fix"]:
                 auto.append(f"{s} : {combien} — la construction les remettra d'aplomb")
+            elif getattr(config, "CFB_MASTER_FROM_CATALOG", True):
+                # Le maître est RÉIMPORTÉ du catalogue : l'écart est une faute de frappe du
+                # cataloguage, et il ne voyage pas jusqu'au client. Il reste bon à savoir —
+                # Phase A pèse les Sacs sur ces quantités — mais il n'empêche plus de partir.
+                notes.append(f"{s} : {combien} entre tes listes et le catalogue. Le maître "
+                             f"étant réimporté, le client reçoit le bon compte ; seul le "
+                             f"calcul des Sacs s'appuyait dessus")
             else:
                 # Sacs déjà multipliés : le correcteur passe en lecture seule, donc
                 # personne ne corrigera. Le bureau se contente d'avertir et construit ;
@@ -1461,9 +1468,18 @@ def build_cfb(name, out_dir=None, log=print):
     """Un seul .bsx pour tout le batch — ce que le client a demandé. Il atterrit dans le
     dossier du batch, à côté du fichier de consolidation."""
     from . import finalize
-    res = finalize.build_cfb_files(folders(name),
-                                   out_dir=out_dir or batch_dir(name, create_it=True),
-                                   log=log, name=str(name))
+    out = out_dir or batch_dir(name, create_it=True)
+    if getattr(config, "CFB_MASTER_FROM_CATALOG", True):
+        # Le contenu physique, pas sa transcription : l'inventaire de chaque set x son
+        # nombre d'exemplaires, consolide. Voir config.CFB_MASTER_FROM_CATALOG.
+        from .plan import set_multiplier_of
+        rows = []
+        for s in get(name).get("sets", []):
+            f = folder_of(s)
+            rows.append((str(s), (set_multiplier_of(f)[0] if f else 1) or 1))
+        res = finalize.build_from_catalog(rows, out_dir=out, name=str(name), log=log)
+    else:
+        res = finalize.build_cfb_files(folders(name), out_dir=out, log=log, name=str(name))
     # Le maitre est construit : les sets sont emballes et n'attendent plus que le transporteur.
     # C'est l'etape que rien ne marquait — on ne savait plus, en regardant la liste, ce qui
     # etait pret a partir et ce qui restait a trier.

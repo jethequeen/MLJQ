@@ -671,6 +671,20 @@ BATCH_APPLY_QUIET_SECONDS = 120
 # clears the marker. Set to False to disable and keep quantities as-is.
 CFB_MULTIPLY_FROM_SHEET = True
 
+# Le MAITRE est-il construit par REIMPORT du catalogue (inventaire du set x N, consolide
+# entre les sets) plutot que par consolidation des fichiers catalogues a la main ?
+#
+# Oui, parce que ce qu'on expedie est le contenu PHYSIQUE de boites scellees : LEGO y a mis
+# l'inventaire du set, on en a ouvert N, donc on detient cet inventaire x N. Le cataloguage
+# n'est qu'une transcription de ce contenu — il sert a TRIER (il dit dans quel sachet chaque
+# piece se trouvait), il ne fait pas autorite sur ce qu'on possede, et une faute de frappe y
+# cree un ecart qui n'existe nulle part dans le monde physique.
+#
+# Mesure sur l'envoi 1 (11503 x9 + 11381 x10) : 514 lots et 25 563 pieces des deux cotes,
+# aucun lot en trop ni en moins, 3 lots de quantite differente — les 3 fautes de frappe.
+# False redonne l'ancienne consolidation des fichiers.
+CFB_MASTER_FROM_CATALOG = True
+
 # --- CFB finalizer (Phase C: build the file to send to Canada First Brick) -----
 # Where the consolidated "<set-number>.bsx" (master) and "<set-number> - restants.bsx"
 # are written when you hit "Construire fichier CFB".

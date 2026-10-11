@@ -128,6 +128,79 @@ def _validate_before_build(set_folder, log):
     return report, warnings
 
 
+class _MergedLot(object):
+    """Un lot du maitre : une piece, une couleur, la quantite cumulee sur tout l'envoi.
+
+    Assez de surface pour `bsx.write_inventory`, qui n'ecrit ni prix ni categorie — c'est
+    voulu : BrickStore les remplit depuis sa propre base a l'ouverture, donc ils sont
+    toujours a jour, et le client refait son prix de toute facon."""
+    __slots__ = ("item_id", "item_type", "color_id", "color_name", "item_name", "qty")
+
+    def __init__(self, part, qty):
+        self.item_id, self.item_type = part.item_id, part.item_type
+        self.color_id, self.color_name = part.color_id, part.color_name
+        self.item_name = getattr(part, "item_name", "") or ""
+        self.qty = qty
+
+
+def build_from_catalog(sets, out_dir=None, name=None, cat=None, log=None):
+    """Le maitre par REIMPORT : l'inventaire de chaque set, x son nombre d'exemplaires,
+    consolide entre les sets. `sets` est [(numero, multiplicateur), ...].
+
+    POURQUOI c'est la bonne source, et pas un raccourci. Ce qu'on expedie, c'est le contenu
+    PHYSIQUE de boites scellees : LEGO y a mis l'inventaire du set, on en a ouvert N, donc
+    on en detient l'inventaire x N. Le cataloguage a la main, lui, n'est qu'une TRANSCRIPTION
+    de ce contenu — utile pour trier (il dit dans quel sachet chaque piece se trouvait), mais
+    il ne fait pas autorite sur ce qu'on possede. Une faute de frappe y cree un ecart qui
+    n'existe nulle part dans le monde physique.
+
+    Mesure sur l'envoi 1 (11503 x9 + 11381 x10) : 514 lots et 25 563 pieces des deux cotes,
+    aucun lot en trop ni en moins, et 3 lots dont la quantite differe — les 3 fautes de
+    frappe, justement. Le reimport les efface au lieu de les expedier.
+
+    Les pieces en trop sont INCLUSES (`include_extras=True`), comme a l'achat
+    (`purchases._ensure_inventory_file`) et comme la reference de `verify` : elles sont dans
+    la boite, donc le client les recoit.
+    """
+    from . import bsx
+    log = log or (lambda _m: None)
+    if cat is None:
+        from . import catalogdb
+        cat = catalogdb.shared()
+    out_dir = out_dir or config.CFB_OUTPUT_DIR
+    if not name:
+        name = str(sets[0][0]) if len(sets) == 1 else None
+    if not name:
+        raise ValueError("un envoi de plusieurs sets a besoin d'un nom de fichier")
+
+    merged, order = {}, []
+    for set_no, mult in sets:
+        mult = int(mult or 1)
+        parts = cat.inventory(str(set_no), include_extras=True)
+        if not parts:
+            raise RuntimeError(f"le catalogue ne connait pas le set {set_no}")
+        n = 0
+        for p in parts:
+            k = (str(p.item_type), str(p.item_id), int(p.color_id))
+            if k in merged:
+                merged[k].qty += p.qty * mult
+            else:
+                merged[k] = _MergedLot(p, p.qty * mult)
+                order.append(k)
+            n += p.qty * mult
+        log(f"   {set_no} x{mult} : {len(parts)} lots, {n} pieces")
+
+    lots = [merged[k] for k in order]
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"{name}.bsx")
+    bsx.write_inventory(path, lots)
+    qty = sum(l.qty for l in lots)
+    log(f"Maitre (reimport) : {len(lots)} lots, {qty} pieces -> {path}")
+    return {"path": path, "master_path": path, "restants_path": None,
+            "master_lots": len(lots), "master_qty": qty, "restants_lots": 0,
+            "set_number": name, "warnings": [], "source": "catalogue"}
+
+
 def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
     """
     Consolidate the set's bags, split on the "x" cleanup mark, and write the master +

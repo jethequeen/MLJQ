@@ -1323,9 +1323,45 @@ Un set quitte le « non traité » exactement quand il est marqué **Livré** (`
 sort de `inventory`) — c'est-à-dire quand il entre dans la file de saisie de CFB. Pas de
 double compte, pas de trou.
 
+## Le maître d'un envoi : un RÉIMPORT, pas une transcription
+
+Depuis le 2026-10-11, le maître d'un envoi est **réimporté du catalogue** : l'inventaire de
+chaque set × son nombre d'exemplaires, consolidé entre les sets
+(`finalize.build_from_catalog`, drapeau `CFB_MASTER_FROM_CATALOG`). C'est exactement l'import
+fait à l'achat (`purchases._ensure_inventory_file`), multiplié et fusionné.
+
+**Pourquoi c'est la bonne source.** Ce qu'on expédie est le contenu physique de boîtes
+scellées : LEGO y a mis l'inventaire du set, on en a ouvert N, donc on détient cet inventaire
+×N. Le cataloguage à la main n'est qu'une **transcription** de ce contenu — il sert à trier,
+puisqu'il dit dans quel sachet chaque pièce se trouvait, mais il ne fait pas autorité sur ce
+qu'on possède. Une faute de frappe y crée un écart qui n'existe nulle part dans le monde
+physique, et l'ancien maître l'expédiait au client.
+
+**Mesuré sur l'envoi 1** (11503 ×9 + 11381 ×10), les deux méthodes côte à côte : **514 lots et
+25 563 pièces des deux côtés, aucun lot en trop ni en moins**, et 3 lots dont la quantité
+diffère — les 3 fautes de frappe, justement :
+
+| lot | réimport | ancienne méthode |
+|---|---|---|
+| 35459 Black — Tile, Modified 1 x 3 Inverted with Hole | 70 | 80 |
+| 3710 Dark Green — Plate 1 x 4 | 80 | 90 |
+| 7126 Dark Green — Slope, Curved 1 x 1 | **100** | 80 |
+
+Prix et catégorie sont volontairement omis (`bsx.write_inventory`) : BrickStore les remplit
+depuis sa propre base à l'ouverture, et le client refait son prix de toute façon.
+
+Conséquence sur la vérification : un écart de cataloguage **n'empêche plus de partir** — il
+devient une note. Il reste bon à savoir, parce que Phase A pèse les Sacs sur ces quantités,
+mais il ne voyage plus jusqu'au client. `CFB_MASTER_FROM_CATALOG = False` redonne l'ancienne
+consolidation.
+
+Ce qui reste à l'ancienne méthode : le maître d'un set **hors envoi**
+(`finalize.build_cfb_files`), et avec lui la marque « x » — un artefact de l'époque où
+l'inventaire servait autrement, que le flux actuel n'utilise plus.
+
 ## Vérification avant l'envoi à CFB
 
-`build_cfb_files` validates the set **before** it builds the master
+`build_cfb_files` (l'ancienne voie) validates the set **before** it builds the master
 (`CFB_VERIFY_ON_BUILD`), because this is the last moment before it leaves:
 
 - the leftovers are brought to the bags' **×N** scale. The Inventory is written at base (one
