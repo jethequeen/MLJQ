@@ -1312,6 +1312,151 @@ def mark_phase(sets, phase, log=None):
     return touched
 
 
+def _short_list(nums, limit=8):
+    """« 3, 7, 12 » — et « … (+5) » au-delà, parce que ça s'affiche sur un téléphone."""
+    nums = list(nums)
+    head = ", ".join(str(n) for n in nums[:limit])
+    return head + (f" … (+{len(nums) - limit})" if len(nums) > limit else "")
+
+
+def _diff_lines(diffs, mult, limit=6):
+    """Nomme les lots en écart, en PIÈCES PAR EXEMPLAIRE et en total physique.
+
+    `verify.check` compare à l'échelle d'UN exemplaire (`_have_base`), alors que le maître
+    part à ×N : dire « 4 pièces » quand le client en recevra 40 de trop ou de moins, c'est
+    faire manquer la décision. Les deux chiffres sont donc affichés."""
+    out = []
+    for k, exp, have, part, _lots in diffs[:limit]:
+        nom = (getattr(part, "item_name", "") or "")[:38] if part else ""
+        col = (getattr(part, "color_name", "") or "") if part else ""
+        quoi = f"{k[1]} {col}".strip() + (f" ({nom})" if nom else "")
+        if have is None:
+            out.append(f"{quoi} : introuvable, {exp}/exemplaire attendus")
+            continue
+        d = have - exp
+        signe = "+" if d > 0 else "−"
+        out.append(f"{quoi} : {have} au lieu de {exp} par exemplaire "
+                   f"({signe}{abs(d) * (mult or 1)} pièces au total)")
+    if len(diffs) > limit:
+        out.append(f"… et {len(diffs) - limit} autre(s)")
+    return out
+
+
+def preflight(name, cat=None):
+    """Ce qui empêche l'envoi « name » de partir — EN LECTURE SEULE.
+
+    C'est le « bouton de vérification » : son intérêt est de séparer trois choses que le
+    journal du bureau mélangeait, parce qu'elles n'appellent pas la même réaction.
+
+      * `blockers` — une action DE TOI : un sac pas coché, l'envoi encore ouvert, des lots
+        en écart que la construction ne peut plus corriger seule ;
+      * `auto` — ce que « Construire le CFB » réglera tout seul, et qu'il faut quand même
+        savoir : l'échelle de l'inventaire de restes, les lots encore rattrapables ;
+      * `notes` — ce qui n'empêche rien.
+
+    **Rien n'est écrit.** `verify.check` compare sans toucher, et on ne passe JAMAIS par
+    `normalize_inventory`, qui lui écrit — un bouton de vérification doit pouvoir se
+    presser dix fois de suite sans rien changer au monde. La construction, elle, refait la
+    même passe en mode correcteur (`finalize._validate_before_build`).
+    """
+    from . import verify
+    from . import remote as _remote
+    from .plan import set_multiplier_of
+
+    b = get(name)
+    if not b:
+        return {"batch": name, "ok": False, "sets": [], "auto": [], "notes": [],
+                "blockers": [f"envoi « {name} » inconnu"]}
+
+    blockers, auto, notes, rows = [], [], [], []
+    if not b.get("closed"):
+        blockers.append("l'envoi est encore ouvert — ferme-le d'abord, sinon la "
+                        "numérotation des Sacs peut encore bouger")
+    st = status(name)
+    for miss in st["missing"]:
+        blockers.append(f"dossier introuvable pour le set {miss}")
+
+    state = _remote._read_json(config.SET_STATUS_FILE, {}) or {}
+    for s in b.get("sets", []):
+        f = folder_of(s)
+        if f is None:
+            continue
+        row = {"set": str(s), "ok": True, "bags": "", "gap": None, "details": []}
+
+        if not _catalogue_done(f):
+            blockers.append(f"{s} : cataloguage pas fini")
+            row["ok"] = False
+
+        total = bag_total(f)
+        done = [x for x in ((state.get(str(s)) or {}).get("bags_done") or [])
+                if 1 <= x <= total]
+        row["bags"] = f"{len(done)}/{total}" if total else "—"
+        if total and len(done) < total:
+            manque = [n for n in range(1, total + 1) if n not in done]
+            blockers.append(f"{s} : sac(s) pas encore coché(s) — {_short_list(manque)}")
+            row["ok"] = False
+
+        mult = 1
+        try:
+            mult = set_multiplier_of(f)[0] or 1
+        except Exception:
+            pass
+
+        # L'inventaire de restes s'écrit à la quantité d'un exemplaire et passe à ×N à
+        # l'Apply. S'il est resté à ×1, le maître l'emporterait à 1/N — la construction le
+        # rattrape, mais on le DIT, parce que c'est un écart de pièces réelles.
+        inv = find_inventory(f)
+        if inv and mult > 1:
+            try:
+                with open(inv, "r", encoding="utf-8") as fh:
+                    if bsx.multiplication_state(fh.read(), mult) == "base":
+                        auto.append(f"{s} : inventaire de restes encore à ×1 — la "
+                                    f"construction le passera à ×{mult}")
+            except OSError:
+                pass
+
+        rep = None
+        try:
+            if cat is None:
+                from . import catalogdb
+                cat = catalogdb.shared()
+            rep = verify.check(f, cat, set_no=str(s), multiplier=mult)
+        except Exception as e:
+            notes.append(f"{s} : comparaison au catalogue impossible ({str(e)[:60]})")
+        if rep and rep["diffs"]:
+            n, gap = len(rep["diffs"]), rep["gap_qty"]
+            row["gap"] = gap
+            row["details"] = _diff_lines(rep["diffs"], mult)
+            # `gap` est par EXEMPLAIRE ; le maître part à ×N, donc on donne les deux.
+            combien = (f"{n} lot(s) en écart — {gap} pièce(s) par exemplaire, "
+                       f"{gap * mult} au total" if mult > 1
+                       else f"{n} lot(s) en écart — {gap} pièce(s)")
+            if rep["can_fix"]:
+                auto.append(f"{s} : {combien} — la construction les remettra d'aplomb")
+            else:
+                # Sacs déjà multipliés : le correcteur passe en lecture seule, donc
+                # personne ne corrigera. Le bureau se contente d'avertir et construit ;
+                # ici on arrête, parce que c'est précisément la question posée.
+                blockers.append(f"{s} : {combien}, que la construction ne corrigera PAS "
+                                f"— à régler dans BrickStore, sinon le maître part avec "
+                                f"l'écart")
+                row["ok"] = False
+        rows.append(row)
+
+    if not layout_is_final(name):
+        notes.append("la numérotation des Sacs n'est pas encore figée — le fichier de "
+                     "consolidation n'a donc pas été écrit")
+    else:
+        import glob as _glob
+        if not _glob.glob(os.path.join(batch_dir(name), f"{name} - consolidation.bsx")):
+            notes.append("pas de fichier de consolidation dans le dossier de l'envoi "
+                         "(bouton « Consolidation » sur le PC)")
+
+    return {"batch": name, "ok": not blockers, "blockers": blockers, "auto": auto,
+            "notes": notes, "sets": rows,
+            "pieces": st["pieces"], "nsets": len(st["sets"])}
+
+
 def build_cfb(name, out_dir=None, log=print):
     """Un seul .bsx pour tout le batch — ce que le client a demandé. Il atterrit dans le
     dossier du batch, à côté du fichier de consolidation."""

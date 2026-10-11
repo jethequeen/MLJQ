@@ -12,6 +12,12 @@ demandes" button, or `python -m sortpack.remote` via Task Scheduler):
                       and write each leftover's Sac destination).
        "build_cfb"  → Construire fichier CFB  (consolidate + split "x" + write master /
                       restants; emails them when config.REMOTE_CFB_EMAIL).
+   Two more carry a BATCH name instead of a set (payload.batch), because an envoi leaves
+   as ONE master and no single set owns that step:
+       "batch_check" → Vérifier l'envoi  (batch.preflight: what blocks the master, in
+                      READ-ONLY — it never writes, so it can be pressed ten times).
+       "batch_cfb"   → Construire le CFB de l'envoi  (refused while the check blocks;
+                      emails it, and leaves « Marquer livré » to the desktop).
    The phone's Finances tab queues the same jobs the desktop's "achats & comptabilité"
    buttons run — these carry no set, so they need no folder:
        "sync_purchases" → Synchroniser les achats  (Journal → base + CFB folders).
@@ -55,7 +61,12 @@ AUTO_APPLY_FILE = os.path.join(config.CATALOGUAGE_ROOT, "auto_apply.json")
 _SET_ACTIONS = ("restants", "build_cfb", "restant_done", "restant_move")
 _GLOBAL_ACTIONS = ("sync_purchases", "buy_report", "cfb_inventory", "end_of_month",
                    "check_cookies")
-_VALID_ACTIONS = _SET_ACTIONS + _GLOBAL_ACTIONS
+# Portée ENVOI : ni par set (un envoi n'a pas de dossier de set) ni globale (il faut savoir
+# lequel). Le nom de l'envoi voyage dans `payload.batch`.
+#   "batch_check" → la passe de vérification, EN LECTURE SEULE (batch.preflight) ;
+#   "batch_cfb"   → le maître de tout l'envoi + le courriel, refusé si le check bloque.
+_BATCH_ACTIONS = ("batch_check", "batch_cfb")
+_VALID_ACTIONS = _SET_ACTIONS + _GLOBAL_ACTIONS + _BATCH_ACTIONS
 
 
 # --- small JSON helpers ------------------------------------------------------
@@ -423,6 +434,69 @@ def _do_build_cfb(folder, email):
 # result the phone shows under the button. They run on the PC because they need the local
 # catalog / price guide and the sheet token.
 
+def _do_batch_check(name):
+    """« Vérifier l'envoi » — ce qui empêche le maître de partir, sans RIEN écrire.
+
+    Le texte revient en lignes préfixées, et le préfixe porte le sens, parce que c'est lui
+    que le téléphone colore : ⛔ une action de toi, ⚙ ce que la construction corrigera
+    seule, · ce qui n'empêche rien. Le détail des lots en écart suit le blocage de son set —
+    « règle ça dans BrickStore » sans nommer les lots n'est pas une réponse."""
+    from . import batch as _batch
+    r = _batch.preflight(name)
+    lines = [f"Envoi « {name} » : {r['nsets']} set(s), {r['pieces']} pièces."]
+    if r["ok"]:
+        lines.append("✔ Tout est beau — le fichier CFB peut être construit.")
+    else:
+        lines.append(f"⛔ {len(r['blockers'])} action(s) à prendre avant de construire.")
+    for b in r["blockers"]:
+        lines.append("⛔ " + b)
+    for row in r["sets"]:
+        for d in row.get("details") or []:
+            lines.append(f"   · {row['set']} — {d}")
+    for a in r["auto"]:
+        lines.append("⚙ " + a)
+    for n in r["notes"]:
+        lines.append("· " + n)
+    for row in r["sets"]:
+        lines.append(f"· {row['set']} : sacs cochés {row['bags']}")
+    return "\n".join(lines)
+
+
+def _do_batch_cfb(name, email):
+    """Construire le maître de tout l'envoi, depuis le téléphone.
+
+    Le check est REJOUÉ ici : le bouton du téléphone peut avoir été débloqué il y a une
+    heure, et entre-temps un sac a pu bouger. Un maître faux est irrattrapable une fois
+    parti au client, alors on paie la vérification deux fois.
+
+    Ce qu'on ne fait PAS, à la différence du flux par set : solder l'envoi. « Marquer
+    livré » sort les copies du stock et envoie les dossiers à la corbeille — ça se décide
+    quand le colis quitte vraiment la maison, pas quand le courriel part."""
+    from . import batch as _batch
+    from . import finalize
+    r = _batch.preflight(name)
+    if not r["ok"]:
+        raise RuntimeError("envoi pas prêt — " + " | ".join(r["blockers"][:2])
+                           + (" …" if len(r["blockers"]) > 2 else "")
+                           + " (relance « Vérifier » pour le détail)")
+    lines = []
+    res = _batch.build_cfb(name, log=lines.append)
+    msg = (f"CFB envoi « {name} » : {res['master_lots']} lots / "
+           f"{res['master_qty']} pièces.")
+    if res["restants_lots"]:
+        msg += f" Écartés « x » : {res['restants_lots']} lots."
+    for w in res.get("warnings", []):
+        msg += " " + w
+    if email and config.CFB_APPS_SCRIPT_URL:
+        paths = [p for p in (res["master_path"], res["restants_path"]) if p]
+        reply = finalize.email_files(paths, subject=f"CFB — batch {name}")
+        msg += f" Courriel envoyé ({reply})."
+        msg += " Il reste « Marquer livré » sur le PC quand le colis part."
+    elif email:
+        msg += " (Apps Script non configuré — courriel non envoyé.)"
+    return msg
+
+
 def _do_sync_purchases(log):
     """Journal (Catégorie-A) → bought table + missing CFB folders. Same as the desktop
     "Synchroniser les achats"."""
@@ -574,12 +648,20 @@ def process_pending(log=print, backup=True, email=None, wdb=None, force=False):
             continue
         _update(cid, status="running")
         is_global = action in _GLOBAL_ACTIONS
+        is_batch = action in _BATCH_ACTIONS
+        bname = str((cmd.get("payload") or {}).get("batch") or "").strip()
         label = (action if is_global
-                 else (cmd.get("name") or cmd.get("number") or cmd.get("key")))
+                 else (f"envoi {bname or '?'}" if is_batch
+                       else (cmd.get("name") or cmd.get("number") or cmd.get("key"))))
         try:
             if is_global:
                 result = _GLOBAL_HANDLERS[action](log)
                 mobile.mark_run(action)
+            elif is_batch:
+                if not bname:
+                    raise RuntimeError("envoi non précisé")
+                result = (_do_batch_check(bname) if action == "batch_check"
+                          else _do_batch_cfb(bname, email))
             else:
                 folder = _resolve_folder(cmd)
                 if folder is None:
