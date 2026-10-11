@@ -454,7 +454,12 @@ clasp pull --versionNumber 20 && diff Code.js "…/appscript/SortPack_mobile.gs"
 ```
 
 **Pousser.** `clasp push` écrase le projet distant avec les fichiers locaux — donc on tire
-d'abord, on compare, et seulement ensuite on pousse. Puis `clasp redeploy <deploymentId>`
+d'abord, on compare, et seulement ensuite on pousse. Deux pièges, tous deux
+contre-intuitifs : `list-scripts` / `clone` / `pull` passent par l'API **Drive** et marchent
+avec l'API Apps Script éteinte, donc une liste qui s'affiche ne dit **pas** que `push`
+marchera (seul `push` exige l'interrupteur de `script.google.com/home/usersettings`) ; et
+`redeploy` annonce `@21` alors que `list-deployments` affiche encore `@20` — c'est de la
+propagation, pas un échec, mais on relit la version avant d'affirmer quoi que ce soit. Puis `clasp redeploy <deploymentId>`
 sur le déploiement **existant** : il crée la version et l'y pointe. Il y a deux
 déploiements, et la distinction compte — l'un est `@HEAD` (l'URL `/dev`, de test), l'autre
 est le vrai web app, **celui qui est sur l'écran d'accueil du téléphone**. Un *nouveau*
