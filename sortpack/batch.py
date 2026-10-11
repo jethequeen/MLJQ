@@ -1531,12 +1531,8 @@ def preflight(name, cat=None):
         elif cs["error"]:
             blockers.append(f"« {name} - consolidation.bsx » est illisible")
         elif not cs["done"]:
-            blockers.append(f"consolidation pas terminée — {cs['lots']} lot(s) restent dans "
-                            f"« {name} - consolidation.bsx » ({cs['groups']} sous-sac(s) à "
-                            f"confectionner). Supprime les lignes à mesure que tu fais les "
-                            f"sous-sacs ; le fichier vide vaut « fini »")
-        else:
-            notes.append("consolidation terminée — le fichier est vide")
+            blockers.append(f"consolidation : {cs['groups']} sous-sac(s) à faire "
+                            f"({cs['lots']} lots)")
 
     return {"batch": name, "ok": not blockers, "blockers": blockers, "auto": auto,
             "notes": notes, "sets": rows, "consolidation": cs,

@@ -428,9 +428,9 @@ def _do_batch_check(name):
     r = _batch.preflight(name)
     lines = [f"Envoi « {name} » : {r['nsets']} set(s), {r['pieces']} pièces."]
     if r["ok"]:
+        # Chaîne testée par la page pour ouvrir « Construire » (checkIsGreen) : la changer
+        # ici veut dire la changer là-bas.
         lines.append("✔ Tout est beau — le fichier CFB peut être construit.")
-    else:
-        lines.append(f"⛔ {len(r['blockers'])} action(s) à prendre avant de construire.")
     for b in r["blockers"]:
         lines.append("⛔ " + b)
     for row in r["sets"]:

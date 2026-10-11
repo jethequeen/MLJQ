@@ -918,16 +918,7 @@
       if(opened && st.label === 'Séparer les sacs'){
         html += '<div class="acts"><button class="act solid" data-act="separated">'
              + 'Séparation terminée' + '</button></div>'
-             + '<div class="hint">Répartis les sachets numérotés des boîtes en piles par '
-             + 'numéro &#8212; après, le cataloguage par sac n&#39;est plus possible.</div>';
-      }
-      if(s.base==='Cataloguer'){
-        html += '<div class="hint">Cataloguage en cours &#8212; rien à trier pour l\'instant.</div>';
-      } else if(s.cataloguing){
-        // Set d'un envoi ferme : les Sacs sont ouverts et numerotes une fois pour toutes,
-        // donc les sacs deja catalogues se trient pendant qu'on catalogue le reste.
-        html += '<div class="hint">Cataloguage en cours &#8212; les sacs déjà faits se trient, '
-             + 'les suivants apparaîtront ici.</div>';
+             + '<div class="hint">Après, le cataloguage par sac n&#39;est plus possible.</div>';
       }
       if(s.base !== 'Cataloguer' && opened){
         // « Appliquer restant » is gone: leftovers are placed one at a time, in the bag you
@@ -945,25 +936,15 @@
           var mates = SETS.filter(function(x){ return x.batch === s.batch; });
           var left  = mates.filter(function(x){
             return x.cataloguing || !(x.bags>0 && x.done.length>=x.bags); });
-          html += '<div class="gate">'
-               + (allSorted ? '✓ Ce set est trié. ' : '')
-               + 'Le ma&#238;tre couvre tout l&#39;envoi &#8212; il se construit en haut de '
-               + 'cette page, pas set par set.';
           if(left.length){
-            html += '<br>Reste &#224; finir : '
-                 + left.map(function(x){ return esc(x.number || x.name); }).join(', ') + '.';
-          } else {
-            html += '<br>Tout l&#39;envoi est tri&#233; : &laquo;&nbsp;V&#233;rifier '
-                 + 'l&#39;envoi&nbsp;&raquo;, puis &laquo;&nbsp;Construire le CFB&nbsp;&raquo;.';
+            html += '<div class="gate">Reste &#224; finir : '
+                 + left.map(function(x){ return esc(x.number || x.name); }).join(', ')
+                 + '.</div>';
           }
-          html += '</div>';
         } else {
           html += '<div class="acts">';
           html += '<button class="act solid'+(allSorted?'':' off')+'" data-act="build_cfb"'+(allSorted?'':' disabled')+'>Construire CFB</button>';
           html += '</div>';
-          if(!allSorted){
-            html += '<div class="gate">Trie tous les sacs pour activer les actions.</div>';
-          }
         }
       }
       if(s.cmd){
@@ -1187,10 +1168,6 @@
             + '<button class="act" data-bact="batch_check">Vérifier l&#39;envoi</button>'
             + '<button class="act solid' + (ok ? '' : ' off') + '" data-bact="batch_cfb"'
             + (ok ? '' : ' disabled') + '>Construire le CFB</button></div>';
-      if(!ok){
-        html += '<div class="gate">Lance &laquo;&nbsp;V&#233;rifier&nbsp;&raquo; : si tout '
-             + 'est beau la construction s&#39;ouvre, sinon il dira quoi r&#233;gler.</div>';
-      }
       html += batchCmdHtml(b);
     }
     html += '</div>';
@@ -1338,10 +1315,7 @@
     if(!SEARCH.data) return '<div class="center">Chargement&#8230;</div>';
 
     var q = fold(SEARCH.q).trim();
-    if(q.length < 2){
-      return '<div class="hint">Tape au moins 2 caract&#232;res &#8212; num&#233;ro de '
-           + 'pi&#232;ce, nom ou couleur.</div>';
-    }
+    if(q.length < 2) return '';
     var hits = (SEARCH.data.parts || []).filter(function(p){
       return fold(p.id).indexOf(q) >= 0 || fold(p.name).indexOf(q) >= 0
           || fold(p.color).indexOf(q) >= 0;
