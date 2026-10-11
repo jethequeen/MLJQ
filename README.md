@@ -136,10 +136,34 @@ your home screen. It never parses a `.bsx`, never opens the history DB and never
 sheet: the PC writes three small JSON files into the Drive CFB folder and the phone reads
 them (`sort_index.json`, `set_status.json`, `dashboard.json`). Three tabs:
 
-- **Tri** — the sets and their phase, one compact row each. Tap a set to open it: a check-off
-  chip per numbered bag (two-way with the desktop) and the buttons that queue *Appliquer
-  restant* / *Construire CFB* for the PC. Cards start collapsed — the list is for finding the
-  set you are on, and a screenful of bag chips buried it.
+- **Tri** — **deux niveaux : les envois, puis les sets de celui qu'on ouvre.** C'est l'envoi
+  qui part en un seul maître, qui se trie en une seule séquence de Sacs et qu'on cherche d'un
+  bloc ; le set n'est qu'un détail de son contenu, et la liste plate le noyait. Une carte par
+  envoi (pastille d'avancement, sacs cochés, vignettes de ses sets), plus un groupe
+  **Hors envoi** pour les sets traités seuls, qui n'ont pas changé.
+
+  Dans un envoi : l'en-tête porte la **recherche globale** et les deux boutons
+  **Vérifier l'envoi** / **Construire le CFB** (voir plus bas), puis viennent les cartes de
+  set — un chip de coche par sac numéroté (deux-sens avec le bureau), le panneau de tri d'un
+  sac, et *Construire CFB* pour un set hors envoi. Les cartes s'ouvrent au toucher : la liste
+  sert à TROUVER le set où on en est, et un écran de pastilles l'enterrait.
+
+#### Chercher une pièce dans tout l'envoi
+
+« J'ai cette pièce en main, dans quel Sac va-t-elle ? » — à l'échelle de l'envoi, pas du set.
+On tape un numéro de pièce, un nom ou une couleur, et la réponse donne le **Sac de
+destination**, où la pièce est **encore** (`11503 sac 1 · 11381 sac 1`), et sa boîte C/D si
+le plan l'y met en attente.
+
+**Rien de neuf n'est écrit côté PC.** `restants_<set>.json` porte déjà l'index de **tout
+l'envoi** — le plan d'un set de batch planifie l'envoi entier (`restants.bag_help`) — donc
+n'importe lequel de ses sets répond pour tous. La page charge ce fichier une fois (≈150 Ko,
+514 pièces pour l'envoi d'exemple) et filtre ensuite en mémoire : la frappe est instantanée.
+
+Le « où est-elle encore » demande un détour qui vaut d'être dit : les indices de sacs pointent
+dans la marche de l'**envoi**, où chaque pas porte son propriétaire (`bag_owner`) et son
+étiquette (`bags`). Sans le propriétaire, « sac 1 » est ambigu — les deux sets du lot en ont
+un. Et « 7 » et « 7 - 1 » sont le même sac physique, donc on dédoublonne sur le numéro.
 - **Achats** — the latest ranked buy list: the **lot du mois** first (rank, store, prix,
   lot ×qté, ROI, %/an, $/an, mois, a buy link), then the runners-up on demand.
   Chaque carte montre **ROI et Pièces côte à côte** : le premier dit si le set vaut la
@@ -968,11 +992,32 @@ L'index lui donne `batch` (le nom de l'envoi, fermé compris), donc il **ne prop
 finir, et où lancer le maître. Le PC refusait déjà la demande (`remote._do_build_cfb`),
 mais après coup — bouton pressé, erreur affichée.
 
-Ce qui reste à faire à la main sur le PC : **Construire le CFB** et **Marquer livré**. Les y
-amener depuis le téléphone demanderait de nouvelles actions dans la whitelist du `.gs`, et ces
-deux gestes-là ne sont pas urgents : on les fait assis. **Consolidation** a quitté la liste —
-`apply` écrit le fichier dès que la numérotation est définitive, donc il n'y a plus rien à
-lancer pour l'obtenir.
+**Depuis 2026-10-11, le téléphone lance l'envoi.** L'en-tête d'un envoi porte deux boutons,
+et la file du téléphone a gagné une troisième portée pour eux : ni par set (un envoi n'a pas
+de dossier de set) ni globale (il faut savoir lequel), donc `_BATCH_ACTIONS` avec le nom dans
+`payload.batch`.
+
+**Vérifier l'envoi** (`batch.preflight`) n'écrit **rien** : `verify.check` compare sans
+toucher, et on ne passe jamais par `normalize_inventory`, qui lui écrit — un bouton de
+vérification doit pouvoir se presser dix fois sans rien changer au monde. Il trie ses constats
+en trois classes, parce qu'elles n'appellent pas la même réaction :
+
+| | |
+|---|---|
+| ⛔ | une action de toi : envoi encore ouvert, sac pas coché, lots en écart que la construction ne corrigera pas |
+| ⚙ | ce que « Construire » réglera seul : l'échelle de l'inventaire de restes, les lots encore rattrapables |
+| · | ce qui n'empêche rien |
+
+Les lots en écart sont **nommés** — « règle ça dans BrickStore » sans dire quoi n'est pas une
+réponse — et comptés **par exemplaire ET au total**, parce que `verify.check` compare à
+l'échelle d'un exemplaire alors que le maître part à ×N : dire « 4 pièces » quand le client en
+recevra 40 de trop fait manquer la décision.
+
+**Construire le CFB** reste fermé tant que la vérification n'est pas verte, et le PC la
+**rejoue** avant de construire — le bouton a pu être débloqué il y a une heure. Il ne solde
+pas l'envoi : **Marquer livré** sort les copies du stock et jette les dossiers, ça se décide
+quand le colis part vraiment, donc ça reste sur le PC. **Consolidation** a quitté la liste
+pour une autre raison : `apply` écrit le fichier dès que la numérotation est définitive.
 
 ### 3. Un set ajouté à un batch avant d'être catalogué
 
