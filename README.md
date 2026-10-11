@@ -729,6 +729,21 @@ les mêmes colonnes, déjà trié sur Remarks — rien de neuf à apprendre.
 Les lots communs à plusieurs sets du batch sont fusionnés en une ligne — dans le Sac ils ne
 forment qu'un seul lot.
 
+**Tu n'as normalement pas à le demander.** Le fichier ne dépend QUE du plan — le tri, qui
+vient après, n'y change rien — alors `batch.apply` l'écrit lui-même avec le plan qu'il vient
+de poser : à la fin du tri il attend déjà dans le dossier de l'envoi. Ça ne coûte rien,
+`apply` a le plan en main (le bouton, lui, repasse par `build_plan`, la partie chère).
+
+Une seule condition, `batch.layout_is_final` : envoi **fermé**, **tous** ses sets ont un
+dossier, et **aucun** n'est en cours de cataloguage. Chacune nomme un moyen de faire bouger
+encore la numérotation, et une consolidation calculée sur un plan provisoire annoncerait des
+sous-sacs incomplets — un moule d'une seule couleur aujourd'hui en gagne une avec le set
+suivant. Tant qu'une condition tient, l'apply le dit en une ligne et n'écrit rien. Un échec
+d'écriture n'annule jamais l'apply : les remarques, elles, sont dans les fichiers.
+
+Au **plan prévisionnel**, en revanche, pas de `.bsx` possible : il n'y a pas encore de sacs
+dont citer les lots. Seules les stats sortent, et le rapport les donne déjà.
+
 Elle est **locale** : les couleurs d'un moule sont déjà dans le même Sac, donc on n'ouvre
 jamais qu'un Sac à la fois et on n'y cherche rien d'ailleurs. Vérifié sur l'exemple : 0 moule
 réparti sur deux Sacs. La seule exception est un moule **plus lourd qu'un Sac**, que Phase A
@@ -914,9 +929,11 @@ L'index lui donne `batch` (le nom de l'envoi, fermé compris), donc il **ne prop
 finir, et où lancer le maître. Le PC refusait déjà la demande (`remote._do_build_cfb`),
 mais après coup — bouton pressé, erreur affichée.
 
-Ce qui reste à faire à la main sur le PC : **Consolidation**, **Construire le CFB**,
-**Marquer livré**. Les y amener depuis le téléphone demanderait de nouvelles actions dans
-la whitelist du `.gs`, et ces trois gestes-là ne sont pas urgents : on les fait assis.
+Ce qui reste à faire à la main sur le PC : **Construire le CFB** et **Marquer livré**. Les y
+amener depuis le téléphone demanderait de nouvelles actions dans la whitelist du `.gs`, et ces
+deux gestes-là ne sont pas urgents : on les fait assis. **Consolidation** a quitté la liste —
+`apply` écrit le fichier dès que la numérotation est définitive, donc il n'y a plus rien à
+lancer pour l'obtenir.
 
 ### 3. Un set ajouté à un batch avant d'être catalogué
 

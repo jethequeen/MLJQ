@@ -1039,8 +1039,7 @@ class App:
             self.status("Liste de consolidation…")
             p = batch.plan(name, wdb=get_wdb(self.status), pin_sacs=True)
             cp = batch.consolidation_pass(p)
-            res = batch.build_consolidation_bsx(name, wdb=get_wdb(self.status),
-                                                log=lambda m: None)
+            res = batch.build_consolidation_bsx(name, log=lambda m: None, p=p)
             self.log(f"=== Consolidation du batch « {name} » ===")
             self.log(f"Fichier : {res['path']}")
             self.log("Ouvre-le dans BrickStore et trie sur la colonne Remarks : chaque Sac")

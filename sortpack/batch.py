@@ -862,7 +862,7 @@ def consolidation_pass(p):
 CONSO_GROUP = "Sac {sac} · {mould} ({colors})"
 
 
-def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print):
+def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print, p=None):
     """Le fichier de la passe de consolidation, à ouvrir dans BrickStore.
 
     Il ne contient QUE les lots à regrouper : les moules présents en plusieurs couleurs dans
@@ -881,13 +881,19 @@ def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print):
     des listes de sacs est injecté), donc rien de neuf à apprendre.
 
     Les lots communs à plusieurs sets du batch sont fusionnés en une ligne — dans le Sac ils
-    ne forment qu'un seul lot."""
+    ne forment qu'un seul lot.
+
+    `p` : un plan déjà calculé. Le fichier ne dépendant QUE du plan, c'est `apply` qui
+    l'écrit maintenant, avec le plan qu'il vient de poser, dès que la numérotation est
+    définitive (`layout_is_final`) — à la fin du tri le fichier est déjà là. Le bouton
+    « Consolidation » reste pour le reconstruire à la demande, et repasse alors par `plan`."""
     from .restants import _emit_item, _document
-    if wdb is None:
-        from .weightdb import WeightDB
-        wdb = WeightDB()
     out_dir = out_dir or batch_dir(name, create_it=True)
-    p = plan(name, wdb=wdb, pin_sacs=True)
+    if p is None:
+        if wdb is None:
+            from .weightdb import WeightDB
+            wdb = WeightDB()
+        p = plan(name, wdb=wdb, pin_sacs=True)
 
     # un bloc <Item> représentatif par lot, quantités cumulées entre les sets
     blocks, qty, currency = {}, {}, "CAD"
@@ -930,6 +936,27 @@ def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print):
     log(f"Consolidation : {groups} sous-sacs sur {len(sacs)} Sacs, "
         f"{len(texts)} lots → {path}")
     return {"path": path, "groups": groups, "sacs": len(sacs), "lots": len(texts)}
+
+
+def layout_is_final(name, fs=None, done=None):
+    """La numérotation des Sacs de cet envoi ne peut plus bouger.
+
+    Trois conditions, et chacune nomme un moyen de la faire bouger encore : un envoi OUVERT
+    accepte un set de plus ; un set DÉCLARÉ mais sans dossier apportera des lots absents du
+    plan ; un set EN COURS DE CATALOGUAGE apportera d'autres sacs. Tant que l'une tient, le
+    plan est provisoire — et une consolidation calculée dessus annoncerait des sous-sacs
+    incomplets, un moule d'une seule couleur aujourd'hui en gagnant une avec le set suivant.
+    """
+    b = get(name)
+    if not b.get("closed"):
+        return False
+    if fs is None:
+        fs = folders(name, partial=True)
+    if len(fs) != len(b.get("sets", [])):
+        return False
+    if done is None:
+        done = {f: _catalogue_done(f) for f in fs}
+    return all(done.get(f, False) for f in fs)
 
 
 def _report_layout_conflict(p, layout, started, log):
@@ -1049,10 +1076,25 @@ def apply(name, wdb=None, backup=None, log=print):
     for f in fs:
         restants.write_bag_help(f, wdb=wdb)
 
+    # La consolidation ne dépend QUE du plan — le tri, qui vient après, n'y change rien. On
+    # l'écrit donc ici, avec le plan qu'on vient de poser : à la fin du tri le fichier
+    # attend déjà dans le dossier de l'envoi, et il ne reste plus un geste à faire sur le PC
+    # pour l'obtenir. Un échec n'annule rien : les remarques, elles, sont écrites.
+    conso = None
+    if layout_is_final(name, fs, done):
+        try:
+            conso = build_consolidation_bsx(name, log=log, p=p)
+        except Exception as e:
+            log("⚠ consolidation NON écrite (%s) — refais-la par le bouton "
+                "« Consolidation »." % str(e)[:100])
+    else:
+        log("• consolidation : plus tard — la numérotation des Sacs peut encore bouger.")
+
     log(f"✔ Batch « {name} » : {total} lots annotés dans {len(fs)} set(s), "
         f"{p['stats']['sacs']} Sacs.")
     return {"batch": name, "lots": total, "sacs": p["stats"]["sacs"],
-            "folders": fs, "plan": p, "backup_dir": backup_dir}
+            "folders": fs, "plan": p, "backup_dir": backup_dir,
+            "consolidation": conso}
 
 
 # --- auto-apply de l'envoi (pas de bouton) ------------------------------------
