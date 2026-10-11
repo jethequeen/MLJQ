@@ -938,6 +938,36 @@ def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print, p=None):
     return {"path": path, "groups": groups, "sacs": len(sacs), "lots": len(texts)}
 
 
+def consolidation_path(name):
+    return os.path.join(batch_dir(name), f"{name} - consolidation.bsx")
+
+
+def consolidation_state(name):
+    """Où en est la passe de sous-sacs — et c'est le FICHIER qui le dit.
+
+    Le fichier de consolidation ne liste que ce qu'il reste à regrouper. On en supprime les
+    lignes à mesure que les sous-sacs se font, donc **vide = fini**. C'est le principe de
+    tout le reste ici : une phase se lit dans les fichiers plutôt que dans un drapeau que
+    personne ne pense à poser — et celui-ci, en plus, est le document de travail qu'on a
+    sous les yeux en le faisant.
+
+    Renvoie {path, exists, lots, groups, done, error}.
+    """
+    path = consolidation_path(name)
+    if not os.path.exists(path):
+        return {"path": path, "exists": False, "lots": 0, "groups": 0,
+                "done": False, "error": False}
+    try:
+        items = bsx.read_items(path)
+    except Exception:
+        return {"path": path, "exists": True, "lots": 0, "groups": 0,
+                "done": False, "error": True}
+    groups = {(it.get("remarks") or "").strip() for it in items}
+    groups.discard("")
+    return {"path": path, "exists": True, "lots": len(items), "groups": len(groups),
+            "done": not items, "error": False}
+
+
 def layout_is_final(name, fs=None, done=None):
     """La numérotation des Sacs de cet envoi ne peut plus bouger.
 
@@ -1450,17 +1480,31 @@ def preflight(name, cat=None):
                 row["ok"] = False
         rows.append(row)
 
+    # La passe de sous-sacs est une ÉTAPE de l'envoi, pas une suggestion : le client exige
+    # toutes les couleurs d'un moule dans un sous-sac, donc un maître construit avant elle
+    # décrit un colis qui n'existe pas encore. Son avancement se lit dans le fichier, qu'on
+    # vide à mesure — voir consolidation_state.
+    cs = None
     if not layout_is_final(name):
         notes.append("la numérotation des Sacs n'est pas encore figée — le fichier de "
                      "consolidation n'a donc pas été écrit")
     else:
-        import glob as _glob
-        if not _glob.glob(os.path.join(batch_dir(name), f"{name} - consolidation.bsx")):
-            notes.append("pas de fichier de consolidation dans le dossier de l'envoi "
-                         "(bouton « Consolidation » sur le PC)")
+        cs = consolidation_state(name)
+        if not cs["exists"]:
+            blockers.append(f"pas de fichier de consolidation dans le dossier de l'envoi — "
+                            f"il s'écrit à l'Apply, relance « Appliquer le batch »")
+        elif cs["error"]:
+            blockers.append(f"« {name} - consolidation.bsx » est illisible")
+        elif not cs["done"]:
+            blockers.append(f"consolidation pas terminée — {cs['lots']} lot(s) restent dans "
+                            f"« {name} - consolidation.bsx » ({cs['groups']} sous-sac(s) à "
+                            f"confectionner). Supprime les lignes à mesure que tu fais les "
+                            f"sous-sacs ; le fichier vide vaut « fini »")
+        else:
+            notes.append("consolidation terminée — le fichier est vide")
 
     return {"batch": name, "ok": not blockers, "blockers": blockers, "auto": auto,
-            "notes": notes, "sets": rows,
+            "notes": notes, "sets": rows, "consolidation": cs,
             "pieces": st["pieces"], "nsets": len(st["sets"])}
 
 

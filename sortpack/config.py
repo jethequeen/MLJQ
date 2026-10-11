@@ -686,13 +686,8 @@ CFB_MULTIPLY_FROM_SHEET = True
 CFB_MASTER_FROM_CATALOG = True
 
 # --- CFB finalizer (Phase C: build the file to send to Canada First Brick) -----
-# Where the consolidated "<set-number>.bsx" (master) and "<set-number> - restants.bsx"
-# are written when you hit "Construire fichier CFB".
+# Where the master "<set-number>.bsx" is written when you hit "Construire fichier CFB".
 CFB_OUTPUT_DIR = CATALOGUAGE_ROOT
-
-# A lot whose <Remarks> equals exactly this (trimmed, case-insensitive) is treated as
-# physically MISSING from that bag: its quantity is moved to the restants file.
-CFB_MISSING_REMARK = "x"
 
 # --- Emailing the CFB files via a Google Apps Script Web App -------------------
 # Deploy the Apps Script (see appscript/CFB_email.gs) as a Web App, then paste its

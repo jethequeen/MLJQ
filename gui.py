@@ -1118,9 +1118,7 @@ class App:
             self.log(f"=== Batch « {name} » ===")
             self.log(f"Maître : {res['master_lots']} lots, {res['master_qty']} pièces")
             self.log(f"  → {res['master_path']}")
-            if res["restants_lots"]:
-                self.log(f"Pièces « x » écartées : {res['restants_lots']} lots.")
-            paths = [x for x in (res["master_path"], res["restants_path"]) if x]
+            paths = [res["master_path"]]
             if config.CFB_APPS_SCRIPT_URL and messagebox.askyesno(
                     "Envoyer par courriel ?",
                     f"Envoyer {len(paths)} fichier(s) à {config.CFB_EMAIL_TO} ?"):
@@ -1615,13 +1613,7 @@ class App:
                 self.refresh(select_name=self.selected_name())
             except Exception as e:
                 self.log(f"  ⚠ phase « {config.STATUS_PRET} » non posée : {str(e)[:70]}")
-            if res["restants_lots"]:
-                self.log(f"Pièces « x » écartées (non vendues) : {res['restants_lots']} "
-                         f"lots, {res['restants_qty']} pièces.")
-            else:
-                self.log("Pièces « x » écartées : aucune.")
-
-            paths = [p for p in (res["master_path"], res["restants_path"]) if p]
+            paths = [res["master_path"]]
             if config.CFB_APPS_SCRIPT_URL:
                 if messagebox.askyesno(
                         "Envoyer par courriel ?",
@@ -1883,52 +1875,6 @@ class App:
                    command=lambda: (win.grab_release(), win.destroy())).pack(side="right", padx=6)
         set_cb.focus_set()
 
-    def compute_restants(self):
-        """Point 3 — move the 'x'-marked lots into the set's Inventory file and write each
-        leftover's Sac destination (reusing the Sacs already in progress). Backs up first."""
-        try:
-            folder = self.selected_folder()
-            if not folder:
-                messagebox.showinfo("Pick a set", "Select a set in the list first.")
-                return
-            from sortpack.plan import find_inventory
-            inv = find_inventory(folder)
-            if inv is None:
-                messagebox.showerror(
-                    "Pas d'inventaire",
-                    "Aucun fichier « Inventory… » dans ce dossier de set.\n\nCe fichier "
-                    "(pièces non cataloguées) doit exister pour calculer les restants.")
-                return
-            if not messagebox.askyesno(
-                    "Calculer les restants ?",
-                    f"Pour {os.path.basename(folder)} :\n\n"
-                    f"• déplacer les lots marqués « x » des sacs vers\n"
-                    f"  « {os.path.basename(inv)} »\n"
-                    f"• y écrire la destination (Sac / C / B) de chaque restant\n\n"
-                    f"Les fichiers touchés sont sauvegardés d'abord. Continuer ?"):
-                self.status("Annulé.")
-                return
-
-            wdb = get_wdb(self.status)
-            self.status("Calcul des restants…")
-            res = restants.compute_restants(folder, wdb, backup=self.backup_var.get())
-
-            self.output.delete("1.0", "end")
-            self.log(f"=== Restants : set {res['set_number']} ===")
-            self.log(f"Lots « x » déplacés : {res['moved_lots']} "
-                     f"({res['moved_qty']} pièces) depuis {res['bags_touched']} sac(s).")
-            self.log(f"Inventaire des restants : {res['inventory_lots']} lots, "
-                     f"{res['inventory_qty']} pièces.")
-            self.log(f"  → {res['inventory_path']}")
-            if res["backup_dir"]:
-                self.log(f"Sauvegarde : {res['backup_dir']}")
-            self.log("\nOuvre le fichier Inventory, clique la colonne Remarques pour trier, "
-                     "puis emballe. Supprime pour de bon les pièces toujours absentes.")
-            self.status("Restants calculés.")
-        except Exception as e:
-            traceback.print_exc()
-            messagebox.showerror("Error", str(e))
-            self.status("Error.")
 
     def inventory_cfb(self):
         """Read each seller's CFB inventory value (both portals, US→CAD), store the snapshot,

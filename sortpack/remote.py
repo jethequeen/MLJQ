@@ -8,8 +8,6 @@ demandes" button, or `python -m sortpack.remote` via Task Scheduler):
 1. Queued phone requests (``sort_commands.json`` in the CFB folder) — the phone can't run
    the heavy steps itself (they need BrickStore's local catalog + the .bsx files), so it
    drops a request the PC executes:
-       "restants"   → Calculer les restants  (move the "x" lots into the Inventory file
-                      and write each leftover's Sac destination).
        "build_cfb"  → Construire fichier CFB  (consolidate + split "x" + write master /
                       restants; emails them when config.REMOTE_CFB_EMAIL).
    Two more carry a BATCH name instead of a set (payload.batch), because an envoi leaves
@@ -56,9 +54,7 @@ from . import lock
 COMMANDS_FILE = os.path.join(config.CATALOGUAGE_ROOT, "sort_commands.json")
 AUTO_APPLY_FILE = os.path.join(config.CATALOGUAGE_ROOT, "auto_apply.json")
 # per-set actions (need the set's folder) vs global jobs (the Finances tab's buttons)
-# "restants" (the retired « Appliquer restant ») stays accepted so a phone that has not
-# been redeployed yet still gets a real answer instead of "action invalide".
-_SET_ACTIONS = ("restants", "build_cfb", "restant_done", "restant_move")
+_SET_ACTIONS = ("build_cfb", "restant_done", "restant_move")
 _GLOBAL_ACTIONS = ("sync_purchases", "buy_report", "cfb_inventory", "end_of_month",
                    "check_cookies")
 # Portée ENVOI : ni par set (un envoi n'a pas de dossier de set) ni globale (il faut savoir
@@ -253,17 +249,6 @@ def sorting_started(folder):
 
 # --- the queued actions ------------------------------------------------------
 
-def _do_restants(folder, wdb, backup):
-    from . import restants
-    from .plan import find_inventory
-    if find_inventory(folder) is None:
-        raise RuntimeError("aucun fichier « Inventory… » dans ce set")
-    res = restants.compute_restants(folder, wdb, backup=backup)
-    return (f"Restants : {res['moved_lots']} lot(s) « x » déplacé(s) "
-            f"({res['moved_qty']} pièces) ; inventaire {res['inventory_lots']} lots / "
-            f"{res['inventory_qty']} pièces.")
-
-
 def _earlier_note(res):
     """« a row in a bag you have already sorted changed » — the one thing a second sorter
     cannot see for themselves, and the reason to reopen that file."""
@@ -410,16 +395,14 @@ def _do_build_cfb(folder, email):
     res = finalize.build_cfb_files(folder, log=lines.append)
     msg = (f"CFB : {res['master_lots']} lots / {res['master_qty']} pièces"
            f"{' + inventaire' if res.get('included_inventory') else ''}.")
-    if res["restants_lots"]:
-        msg += f" Écartés « x » : {res['restants_lots']} lots."
     # What the pre-send check did travels back to the phone: a rescaled inventory or an
     # uncorrected gap changes what is in that master, so it must not stay in a log nobody
     # reads — the master is already gone by the time you would look.
     for w in res.get("warnings", []):
         msg += " " + w
     if email and config.CFB_APPS_SCRIPT_URL:
-        paths = [p for p in (res["master_path"], res["restants_path"]) if p]
-        reply = finalize.email_files(paths, subject=f"CFB — set {res['set_number']}")
+        reply = finalize.email_files([res["master_path"]],
+                                    subject=f"CFB — set {res['set_number']}")
         msg += f" Courriel envoyé ({reply})."
         # The set is out the door, so finish it exactly as the desktop would. Only ever
         # after a mail that actually went: a build alone changes nothing.
@@ -483,13 +466,11 @@ def _do_batch_cfb(name, email):
     res = _batch.build_cfb(name, log=lines.append)
     msg = (f"CFB envoi « {name} » : {res['master_lots']} lots / "
            f"{res['master_qty']} pièces.")
-    if res["restants_lots"]:
-        msg += f" Écartés « x » : {res['restants_lots']} lots."
     for w in res.get("warnings", []):
         msg += " " + w
     if email and config.CFB_APPS_SCRIPT_URL:
-        paths = [p for p in (res["master_path"], res["restants_path"]) if p]
-        reply = finalize.email_files(paths, subject=f"CFB — batch {name}")
+        reply = finalize.email_files([res["master_path"]],
+                                    subject=f"CFB — batch {name}")
         msg += f" Courriel envoyé ({reply})."
         msg += " Il reste « Marquer livré » sur le PC quand le colis part."
     elif email:
@@ -666,14 +647,12 @@ def process_pending(log=print, backup=True, email=None, wdb=None, force=False):
                 folder = _resolve_folder(cmd)
                 if folder is None:
                     raise RuntimeError("dossier du set introuvable")
-                if action in ("restants", "restant_done", "restant_move"):
+                if action in ("restant_done", "restant_move"):
                     if _wdb is None:
                         log("Chargement du catalogue BrickStore (poids)…")
                         from .weightdb import WeightDB
                         _wdb = WeightDB()
-                    if action == "restants":
-                        result = _do_restants(folder, _wdb, backup)
-                    elif action == "restant_done":
+                    if action == "restant_done":
                         result = _do_restant_done(folder, cmd.get("payload"), _wdb)
                     else:
                         result = _do_restant_move(folder, cmd.get("payload"), _wdb)

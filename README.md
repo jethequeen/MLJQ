@@ -408,7 +408,7 @@ flag: each set's bags carry a `<lots>/<stamped>` fingerprint that `auto_apply.js
   (that covers the sets applied from the desktop button, which never touches the tracking file);
 - fingerprint changed since we wrote — re-catalogued, or BrickStore saving an old tab over our
   remarks — → **written again**, so a clobbered set repairs itself on the next pass;
-- leftovers Inventory already through **Calculer les restants** → **never touched again**: the
+- leftovers Inventory already marked up (`restants_done`) → **never touched again**: the
   sorting is physically under way, so the Sac layout must not be recomputed.
 
 A set that belongs to an **envoi** is skipped by that pass on purpose — planning it alone
@@ -796,6 +796,17 @@ les mêmes colonnes, déjà trié sur Remarks — rien de neuf à apprendre.
 
 Les lots communs à plusieurs sets du batch sont fusionnés en une ligne — dans le Sac ils ne
 forment qu'un seul lot.
+
+**C'est une étape de l'envoi, pas une suggestion.** Le client exige toutes les couleurs d'un
+moule dans un sous-sac : un maître construit avant cette passe décrit un colis qui n'existe
+pas encore. `batch.preflight` **bloque** donc « Construire le CFB » tant qu'elle n'est pas
+faite, et le téléphone le dit.
+
+Et son avancement se lit **dans le fichier**, parce qu'on le vide à mesure : on supprime les
+lignes des sous-sacs au fur et à mesure qu'on les confectionne, donc **vide = fini**
+(`batch.consolidation_state`). C'est le principe de toutes les phases ici — se lire dans les
+fichiers plutôt que dans un drapeau que personne ne pense à poser — avec un avantage de plus :
+ici le fichier EST le document de travail qu'on a sous les yeux en le faisant.
 
 **Tu n'as normalement pas à le demander.** Le fichier ne dépend QUE du plan — le tri, qui
 vient après, n'y change rien — alors `batch.apply` l'écrit lui-même avec le plan qu'il vient
@@ -1356,8 +1367,8 @@ mais il ne voyage plus jusqu'au client. `CFB_MASTER_FROM_CATALOG = False` redonn
 consolidation.
 
 Ce qui reste à l'ancienne méthode : le maître d'un set **hors envoi**
-(`finalize.build_cfb_files`), et avec lui la marque « x » — un artefact de l'époque où
-l'inventaire servait autrement, que le flux actuel n'utilise plus.
+(`finalize.build_cfb_files`), qui consolide ses sacs. Il n'écarte plus rien — la marque
+« x » a été retirée le même jour.
 
 ## Vérification avant l'envoi à CFB
 
@@ -1477,16 +1488,15 @@ dépendaient et ont été rebranchées : `remote.sorting_started()` remplace `re
 comme signal « le tri a commencé » (il lit la phase réelle — un sac coché ou « Trier » — au
 lieu d'un effet de bord du bouton), sans quoi l'auto-apply se remettrait à renuméroter les
 Sacs en plein tri ; et « Construire CFB » ne dépend plus que du tri terminé, sinon le bouton
-serait resté désactivé pour toujours. `compute_restants` reste dans le code, sans appelant.
+serait resté désactivé pour toujours.
 
-**Restants — "Calculer les restants" (retiré de l'interface) :** while sorting, mark a lot's Remarks with `x`
-when it's missing/uncertain in that bag. This button **moves** those `x` lots out of the
-bags into the set's `Inventory*` file and writes where each leftover goes, reusing the
-Sacs already in progress (`Sac 06`, or `C -> Sac 06` / `D conso (Green, Red) -> Sac 06` when
-it belongs to a consolidation or colour group — the D case lists the mould's colours so you
-know what to regroup). Process that inventory last; delete for good anything
-still absent. The CFB finaliser then folds the inventory into the master; there is no
-`- restants.bsx`.
+**La marque « x » n'existe plus** (retirée le 2026-10-11). On marquait d'un `x` un lot absent
+d'un sac, et « Calculer les restants » le déplaçait dans l'`Inventory*` du set ; le maître
+l'écartait ensuite. C'était un artefact d'un ancien design autour de l'Inventory, et le flux
+actuel — où un restant se place sac par sac depuis le téléphone — ne l'utilisait plus. Elle
+retirait pourtant encore, silencieusement, des pièces de ce qu'on expédie. Sont partis avec
+elle : `compute_restants`, l'action `restants` de la file, son bouton orphelin dans le GUI,
+`CFB_MISSING_REMARK`, et les clés `restants_path` / `restants_lots`.
 
 Backups of every file are copied to a timestamped folder under
 `G:\Mon Disque\MLJQ - Sort and Pack Helper\backups` (inside Google Drive) before

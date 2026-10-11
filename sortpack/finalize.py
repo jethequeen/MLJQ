@@ -196,16 +196,15 @@ def build_from_catalog(sets, out_dir=None, name=None, cat=None, log=None):
     bsx.write_inventory(path, lots)
     qty = sum(l.qty for l in lots)
     log(f"Maitre (reimport) : {len(lots)} lots, {qty} pieces -> {path}")
-    return {"path": path, "master_path": path, "restants_path": None,
-            "master_lots": len(lots), "master_qty": qty, "restants_lots": 0,
-            "set_number": name, "warnings": [], "source": "catalogue"}
+    return {"path": path, "master_path": path, "master_lots": len(lots),
+            "master_qty": qty, "set_number": name, "warnings": [],
+            "source": "catalogue"}
 
 
 def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
     """
-    Consolidate the set's bags, split on the "x" cleanup mark, and write the master +
-    restants .bsx into out_dir (default CFB_OUTPUT_DIR). Returns a result dict with
-    the paths (restants_path is None when there are no leftovers) and summary stats.
+    Consolidate the set's bags and write the master .bsx into out_dir (default
+    CFB_OUTPUT_DIR). Returns a result dict with the path and summary stats.
 
     `set_folder` is ONE set folder or a LIST of them — a BATCH. Several sets shipped
     together consolidate into a SINGLE master, which is the whole point: the customer files
@@ -236,12 +235,11 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
     bags = []
     for f in folders:
         bags.extend(discover_bags(f))
-    mark = config.CFB_MISSING_REMARK.strip().casefold()
 
-    # The master is the numbered bags PLUS the processed leftovers inventory (its 'x' lots
-    # were already moved here by "Calculer les restants"; anything still marked 'x'
-    # anywhere is a piece we no longer have — it is dropped, not sold, and there is no
-    # separate restants file).
+    # Le maître, c'est les sacs numérotés PLUS l'inventaire de restes. Rien n'est écarté :
+    # la marque « x » (un lot déclaré physiquement absent) venait d'un ancien design autour
+    # de l'Inventory et n'est plus posée — elle retirait silencieusement des pièces de ce
+    # qu'on expédie.
     invs = [p for p in (find_inventory(f) for f in folders) if p]
     inv_path = invs[0] if invs else None
     files = list(bags)
@@ -250,14 +248,9 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
 
     present = {}                       # key -> [qty, representative_block]
     order_present = []
-    dropped_lots = dropped_qty = 0
     for _, path, items in files:
         blocks, _ = bsx.read_item_blocks(path)
         for it in items:
-            if it["remarks"].strip().casefold() == mark:
-                dropped_lots += 1
-                dropped_qty += it["qty"]
-                continue
             key = (it["item_id"], it["color_id"], it["condition"])
             if key not in present:
                 present[key] = [0, blocks[it["row"]]]
@@ -278,11 +271,8 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
     return {
         "set_number": num,
         "master_path": master_path,
-        "restants_path": None,
         "master_lots": len(order_present),
         "master_qty": sum(present[k][0] for k in order_present),
-        "restants_lots": dropped_lots,
-        "restants_qty": dropped_qty,
         "included_inventory": bool(inv_path),
         "bags": len(bags),
         "verify": vreport,
