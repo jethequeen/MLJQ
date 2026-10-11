@@ -277,12 +277,35 @@ def _refresh_mobile(action=None):
         pass
 
 
+def _batch_snapshot():
+    """Ce que le téléphone doit savoir de chaque envoi et ne peut pas déduire : où en est la
+    passe de consolidation. Elle se lit dans un `.bsx` qu'on vide à mesure, et le téléphone
+    n'ouvre jamais de .bsx — c'est donc au PC de le lui dire."""
+    out = []
+    try:
+        from sortpack import batch as _b
+    except Exception:
+        return out
+    for name in sorted(_b.all_batches()):
+        row = {"name": name}
+        try:
+            cs = _b.consolidation_state(name)
+            row["conso_written"] = bool(cs["exists"])
+            row["conso_done"] = bool(cs["done"])
+            row["conso_lots"] = int(cs["lots"])
+            row["conso_groups"] = int(cs["groups"])
+        except Exception:
+            pass
+        out.append(row)
+    return out
+
+
 def _write_sort_index(sets):
     """Write the phone-facing snapshot (config.SORT_INDEX_FILE). Best-effort — a Drive
     hiccup here must never break the desktop refresh."""
     try:
         payload = {"generated": datetime.datetime.now().isoformat(timespec="seconds"),
-                   "sets": sets}
+                   "sets": sets, "batches": _batch_snapshot()}
         with open(config.SORT_INDEX_FILE, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
     except OSError:

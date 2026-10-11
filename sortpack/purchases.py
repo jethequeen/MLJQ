@@ -192,9 +192,12 @@ def _attach_to_batch(hist, added, log=print):
         from .history import BUY_SHEET_COLS
     except Exception:
         return []
-    name = buylist.open_batch_target()[0]
+    # Aucun envoi ouvert ? On le crée. Un set acheté pour un envoi qui n'existe pas encore
+    # restait sinon orphelin, et la liste d'achat réclamait un « nouvel envoi » alors qu'on
+    # venait d'acheter pour lui.
+    name = _batch.ensure_open(log=log)
     if not name:
-        return []                        # aucun envoi en cours : rien à rattacher
+        return []
     try:
         idx = BUY_SHEET_COLS.index("set_id")
         chosen = {str(r[idx]) for r in hist.latest_buy_list(chosen_only=True)}

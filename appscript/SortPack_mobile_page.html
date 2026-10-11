@@ -1077,6 +1077,10 @@
     if(b && !b.closed) return {label:'Ouvert — ' + o.n + ' set' + (o.n > 1 ? 's' : ''),
                                cls:'amber'};
     if(o.cat) return {label:'Cataloguer (' + o.done + '/' + o.bags + ')', cls:'orange'};
+    // Tout trié ne veut pas dire prêt : reste la passe de sous-sacs, que le client exige.
+    // Son avancement vient du PC (le fichier de consolidation, qu'on vide à mesure).
+    if(o.bags && o.done >= o.bags && b && b.conso_written && !b.conso_done)
+      return {label:'Consolidation (' + (b.conso_groups || 0) + ')', cls:'blue'};
     if(o.bags && o.done >= o.bags) return {label:'Tout trié ✓', cls:'green'};
     return {label:'Trier (' + o.done + '/' + o.bags + ')', cls:'orange'};
   }
@@ -1878,8 +1882,10 @@
       // le set inscrit alors qu'il a pu être refusé (batch fermé, déjà dans un autre).
       var msg = 'Achat enregistré au Journal ✓';
       if(r.batch){
-        if(r.batch.ok) msg += r.batch.added ? ' · ajouté au batch ' + r.batch.name
-                                            : ' · déjà au batch ' + r.batch.name;
+        if(r.batch.ok) msg += (r.batch.born ? ' · envoi ' + r.batch.name + ' créé'
+                                            : '')
+                            + (r.batch.added ? ' · ajouté au batch ' + r.batch.name
+                                             : ' · déjà au batch ' + r.batch.name);
         else msg += ' · ⚠ batch : ' + r.batch.error;
       }
       // La synchro est le troisième effet : sans elle l'achat ne descend pas dans la base

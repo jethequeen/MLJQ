@@ -5,6 +5,10 @@ On rejoue en Python ce que SortPack_mobile.gs renvoie (getSets / getRestants /
 getDashboard), a partir des VRAIS fichiers JSON du dossier CFB, puis on injecte un
 google.script.run bouchonne juste avant le script de la page. But : voir les erreurs JS et
 la mise en page sans toucher au deploiement.
+
+ATTENTION : ce fichier REJOUE SortPack_mobile.gs. Il derive donc des que le .gs change, et
+la page semble alors buguee alors que c'est le banc qui ment — c'est arrive le 2026-10-11
+avec les champs conso_*. Quand tu touches a getSets, touche ici aussi.
 """
 import io, json, os, re, sys
 
@@ -66,10 +70,20 @@ for c in cmds:
         "action": c["action"], "status": c["status"], "result": c.get("result") or "",
         "created": c.get("created") or "", "finished": c.get("finished") or ""}
 
-batches = [{"name": n, "closed": bool(reg[n].get("closed")),
-            "created": reg[n].get("created") or "",
-            "sets": [str(x) for x in (reg[n].get("sets") or [])],
-            "cmds": bcmd.get(n, {})} for n in sorted(reg)]
+# L'etat de la consolidation vient de l'index, comme dans le .gs : le telephone n'ouvre
+# jamais de .bsx, c'est le PC qui le lui dit.
+conso = {str(r.get("name")): r for r in (idx.get("batches") or []) if r.get("name")}
+batches = []
+for n in sorted(reg):
+    c = conso.get(n, {})
+    batches.append({"name": n, "closed": bool(reg[n].get("closed")),
+                    "created": reg[n].get("created") or "",
+                    "sets": [str(x) for x in (reg[n].get("sets") or [])],
+                    "cmds": bcmd.get(n, {}),
+                    "conso_written": bool(c.get("conso_written")),
+                    "conso_done": bool(c.get("conso_done")),
+                    "conso_lots": int(c.get("conso_lots") or 0),
+                    "conso_groups": int(c.get("conso_groups") or 0)})
 
 # --- getRestants() pour chaque set ------------------------------------------
 restants = {}

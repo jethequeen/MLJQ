@@ -133,9 +133,17 @@ function getSets() {
     bcmd[n][c.action] = { action: c.action, status: c.status, result: c.result || '',
                           created: c.created || '', finished: c.finished || '' };
   });
+  // L'etat de la passe de consolidation vient de l'index : il se lit dans un .bsx qu'on
+  // vide a mesure, et le telephone n'ouvre jamais de .bsx. C'est le PC qui le dit.
+  var conso = {};
+  (idx.batches || []).forEach(function (r) { if (r && r.name) conso[String(r.name)] = r; });
   var batches = Object.keys(reg).sort().map(function (n) {
+    var c = conso[n] || {};
     return { name: n, closed: !!reg[n].closed, created: reg[n].created || '',
-             sets: (reg[n].sets || []).map(String), cmds: bcmd[n] || {} };
+             sets: (reg[n].sets || []).map(String), cmds: bcmd[n] || {},
+             conso_written: !!c.conso_written, conso_done: !!c.conso_done,
+             conso_lots: Number(c.conso_lots || 0),
+             conso_groups: Number(c.conso_groups || 0) };
   });
   return { generated: idx.generated || '', sets: out, batches: batches };
 }
@@ -329,7 +337,13 @@ function setPhase(key, phase) {
  *  server-side). Returns the reply text. The daily desktop sync then mirrors it + creates
  *  the CFB folder / inventory. */
 /** Inscrit un set au registre d'un batch, avec les MEMES regles que sortpack/batch.add :
- *  batch connu et ouvert, pas deja dans un autre batch ouvert, et idempotent.
+ *  pas deja dans un autre batch ouvert, idempotent — et un nom INCONNU cree l'envoi.
+ *
+ *  Creer plutot que refuser : on achete un set POUR un envoi, c'est la raison de l'achat.
+ *  Refuser un nom inconnu laissait le set orphelin (« hors envoi » dans la liste) et la
+ *  liste d'achat continuait de reclamer un « nouvel envoi » alors qu'on venait justement
+ *  d'acheter pour celui-la. Un envoi n'est qu'une ligne de registre : le creer ne coute
+ *  rien et se defait d'un clic sur le PC.
  *
  *  On n'ecrit que le registre. Deplacer le dossier du set dans celui du batch est le travail
  *  du PC (`batch.settle`), et de toute facon ce dossier n'existe pas encore : au moment de
@@ -347,8 +361,12 @@ function addToBatch_(setNo, name) {
   try {
     lock.waitLock(15000);
     var d = readJson_(BATCH_FILE) || {};
-    var b = d[name];
-    if (!b) return { ok: false, error: 'batch « ' + name + ' » inconnu' };
+    var b = d[name], born = false;
+    if (!b) {
+      b = d[name] = { sets: [], created: new Date().toISOString().slice(0, 19),
+                      closed: false };
+      born = true;
+    }
     if (b.closed) return { ok: false, error: 'le batch « ' + name + ' » est ferme' };
     for (var other in d) {
       if (other !== name && !d[other].closed &&
@@ -362,7 +380,7 @@ function addToBatch_(setNo, name) {
       b.sets.push(s);
       writeJson_(BATCH_FILE, d);
     }
-    return { ok: true, name: name, added: !already, sets: b.sets.length };
+    return { ok: true, name: name, added: !already, sets: b.sets.length, born: born };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   } finally {

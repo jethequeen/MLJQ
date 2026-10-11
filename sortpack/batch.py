@@ -83,6 +83,43 @@ def get(name):
     return b
 
 
+def next_name():
+    """Le nom du prochain envoi : le plus grand numéro + 1, « 1 » s'il n'y en a aucun.
+
+    Les envois se numérotent depuis le début, et c'est ce numéro que le téléphone propose
+    dans le champ Batch. Un nom non numérique (un essai) est ignoré pour le calcul plutôt
+    que de bloquer la suite."""
+    nums = []
+    for n in all_batches():
+        try:
+            nums.append(int(str(n).strip()))
+        except ValueError:
+            continue
+    return str(max(nums) + 1) if nums else "1"
+
+
+def ensure_open(log=None):
+    """Le nom de l'envoi OUVERT — en créant le suivant si aucun ne l'est.
+
+    Un set qu'on achète va forcément dans un envoi : c'est la raison même de l'achat, la
+    liste ne propose que de quoi en compléter un. Tant que personne ne créait le suivant, un
+    set acheté après la fermeture du précédent restait orphelin — « hors envoi » dans la
+    liste du téléphone — et la liste d'achat continuait d'annoncer « nouvel envoi » comme si
+    rien n'avait encore été acheté pour lui.
+
+    La règle de « quel envoi est ouvert » n'est pas réécrite ici : c'est celle de
+    `buylist.open_batch_target`, pour qu'il n'y en ait jamais deux qui divergent."""
+    from . import buylist
+    name = buylist.open_batch_target()[0]
+    if name:
+        return name
+    name = next_name()
+    create(name)
+    if log:
+        log(f"  envoi « {name} » créé — aucun n'était ouvert")
+    return name
+
+
 def batch_dir(name, create_it=False):
     """Le dossier du batch : CFB/Batchs/<nom>. Il contient le fichier de consolidation, le
     maître une fois construit, et les dossiers de sets du batch."""
