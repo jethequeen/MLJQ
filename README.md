@@ -1361,10 +1361,11 @@ diffère — les 3 fautes de frappe, justement :
 Prix et catégorie sont volontairement omis (`bsx.write_inventory`) : BrickStore les remplit
 depuis sa propre base à l'ouverture, et le client refait son prix de toute façon.
 
-Conséquence sur la vérification : un écart de cataloguage **n'empêche plus de partir** — il
-devient une note. Il reste bon à savoir, parce que Phase A pèse les Sacs sur ces quantités,
-mais il ne voyage plus jusqu'au client. `CFB_MASTER_FROM_CATALOG = False` redonne l'ancienne
-consolidation.
+Conséquence sur la vérification : **elle ne compare plus les listes au catalogue du tout.**
+L'écart de cataloguage ne voyage plus jusqu'au client, donc il n'a rien à faire dans un
+rapport qui sert à décider si l'envoi peut partir — et `preflight` s'épargne du même coup le
+chargement du catalogue (1,3 s au lieu de plusieurs secondes). `CFB_MASTER_FROM_CATALOG = False`
+redonne l'ancienne consolidation, et avec elle la comparaison.
 
 Ce qui reste à l'ancienne méthode : le maître d'un set **hors envoi**
 (`finalize.build_cfb_files`), qui consolide ses sacs. Il n'écarte plus rien — la marque

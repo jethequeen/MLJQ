@@ -1445,14 +1445,19 @@ def preflight(name, cat=None):
             except OSError:
                 pass
 
+        # Comparer les listes au catalogue n'a plus de portée quand le maître en est
+        # RÉIMPORTÉ : l'écart est une faute de frappe du cataloguage, il ne voyage pas
+        # jusqu'au client, donc il n'a rien à faire dans un rapport qui sert à décider si
+        # l'envoi peut partir. On s'épargne au passage le chargement du catalogue.
         rep = None
-        try:
-            if cat is None:
-                from . import catalogdb
-                cat = catalogdb.shared()
-            rep = verify.check(f, cat, set_no=str(s), multiplier=mult)
-        except Exception as e:
-            notes.append(f"{s} : comparaison au catalogue impossible ({str(e)[:60]})")
+        if not getattr(config, "CFB_MASTER_FROM_CATALOG", True):
+            try:
+                if cat is None:
+                    from . import catalogdb
+                    cat = catalogdb.shared()
+                rep = verify.check(f, cat, set_no=str(s), multiplier=mult)
+            except Exception as e:
+                notes.append(f"{s} : comparaison au catalogue impossible ({str(e)[:60]})")
         if rep and rep["diffs"]:
             n, gap = len(rep["diffs"]), rep["gap_qty"]
             row["gap"] = gap
@@ -1463,13 +1468,6 @@ def preflight(name, cat=None):
                        else f"{n} lot(s) en écart — {gap} pièce(s)")
             if rep["can_fix"]:
                 auto.append(f"{s} : {combien} — la construction les remettra d'aplomb")
-            elif getattr(config, "CFB_MASTER_FROM_CATALOG", True):
-                # Le maître est RÉIMPORTÉ du catalogue : l'écart est une faute de frappe du
-                # cataloguage, et il ne voyage pas jusqu'au client. Il reste bon à savoir —
-                # Phase A pèse les Sacs sur ces quantités — mais il n'empêche plus de partir.
-                notes.append(f"{s} : {combien} entre tes listes et le catalogue. Le maître "
-                             f"étant réimporté, le client reçoit le bon compte ; seul le "
-                             f"calcul des Sacs s'appuyait dessus")
             else:
                 # Sacs déjà multipliés : le correcteur passe en lecture seule, donc
                 # personne ne corrigera. Le bureau se contente d'avertir et construit ;
