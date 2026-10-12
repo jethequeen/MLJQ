@@ -1455,6 +1455,63 @@ Ce qui reste à l'ancienne méthode : le maître d'un set **hors envoi**
 (`finalize.build_cfb_files`), qui consolide ses sacs. Il n'écarte plus rien — la marque
 « x » a été retirée le même jour.
 
+## La décote « années de stock »
+
+Ajoutée le 2026-10-12, après une question simple : la pièce **7527 Dark Green**, ×18 dans le
+Jaguar, pesait **11,3 % du part-out du set** — alors qu'elle a vendu **3 unités en six mois
+pour 1257 en vente**. Soit **210 ans** d'écoulement au rythme actuel.
+
+Les deux décotes existantes ne la rattrapaient qu'à moitié (88,49 $ → 44,83 $) :
+
+* l'**érosion** la ramenait bien de 4,92 $ (vendu) à 3,11 $ (en vente) ;
+* la **demande faible** se calcule sur les ventes ABSOLUES — 3 ventes contre
+  `DEMAND_HEALTHY = 6`, donc à moitié du seuil, donc seulement −20 %.
+
+Aucune des deux ne regarde le **stock en face**. Et le volet vitesse ne la voyait pas non
+plus : son ratio propre est 0,0024, mais 18 pièces sur 1740 ne déplacent le ratio pondéré du
+set que de 1,1 %. Une pièce chère et invendable est invisible dans un modèle de vitesse
+pondéré par la quantité — le dégât n'apparaît que dans la valeur.
+
+```
+années de stock = en_vente / (vendus_6_mois × 2)
+```
+
+C'est la mesure que les deux autres ratent, et elle ne se laisse tromper par aucun des
+pièges habituels : le ratio vendus/en-vente est confondu par la taille du marché (une pièce
+commune, 3000 en vente et 600 vendues, a un ratio bas et s'écoule très bien — 2,5 ans), les
+ventes absolues ignorent le stock. Les années de stock donnent 2,5 ans à la commune et 210 à
+7527.
+
+**Réglage retenu** (`SUPPLY_YEARS_SOFT` / `SUPPLY_YEARS_DEAD` / `SUPPLY_FLOOR`) : aucune
+décote sous **10 ans**, descente linéaire jusqu'à **15 %** à **40 ans**, plancher ensuite.
+Le plancher n'est pas zéro parce que CFB achète en lot : même une pièce qui ne partira pas
+seule vaut quelque chose dans la masse.
+
+**Elle ne se multiplie pas avec la décote de demande — on prend la plus sévère des deux.**
+Les deux mesurent le même fait (la demande est molle) par deux chemins ; les multiplier
+punirait la pièce deux fois pour une seule réalité.
+
+**Mesuré sur les neuf achats réels avant d'activer quoi que ce soit**, et c'est ce qui a
+décidé du réglage : la décote est **sélective**.
+
+| set | payé | retour avant | après | écart | ROI av. | ROI ap. |
+|---|---|---|---|---|---|---|
+| 42226 BMW | 460 | 1791 | 1785 | −0 % | 3,89 | 3,88 |
+| **11381 Jaguar** | 2000 | 4689 | 3884 | **−17 %** | 2,34 | 1,94 |
+| 11503 Flower Wall | 1169 | 2204 | 1967 | −11 % | 1,89 | 1,68 |
+| 43011 | 270 | 596 | 529 | −11 % | 2,21 | 1,96 |
+| 43027 | 180 | 551 | 533 | −3 % | 3,07 | 2,97 |
+| 77256 | 212 | 400 | 390 | −2 % | 1,89 | 1,84 |
+| 42680 | 135 | 248 | 247 | −0 % | 1,84 | 1,83 |
+| **TOTAL** | 4425 | 13142 | 11985 | **−9 %** | 2,97 | 2,71 |
+
+Cinq sets sur neuf bougent de 0 à 3 % — ils sont sains. Le Jaguar prend −17 %, et 7527 y
+passe de 44,83 $ à 8,40 $. **Aucun achat passé ne tombe sous `ROI_FLOOR` (1,2)** — le pire
+après décote est 1,68 — donc la décote resserre le classement sans réécrire l'histoire.
+
+La décote ne vaut que pour les classements à VENIR : les lignes déjà écrites dans la table
+`buy_list` gardent les chiffres de leur époque.
+
 ## Vérification avant l'envoi à CFB
 
 `build_cfb_files` (l'ancienne voie) validates the set **before** it builds the master

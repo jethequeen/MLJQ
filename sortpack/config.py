@@ -72,6 +72,24 @@ REBUY_WINDOW_MONTHS = 18
 # vs currently-listed), we value each such part at the lower current price. Stable/liquid
 # parts (listed >= sold) keep full value. No invented parameters, quantity-independent.
 REALIZATION_ADJUST = True
+
+# --- Décote « années de stock » (dead stock) ----------------------------------
+# Combien d'années il faudrait pour écouler ce qui est EN VENTE au rythme où ça se vend :
+#   années = en_vente / (vendus_6_mois × 2)
+# C'est la mesure que les deux autres ratent. Le ratio vendus/en-vente se laisse tromper
+# par la taille du marché (une pièce commune avec 3000 en vente et 600 vendues a un ratio
+# bas et s'écoule très bien), et les ventes ABSOLUES ne disent rien du stock en face :
+# 7527 Dark Green a vendu 3 pièces en 6 mois — à moitié du seuil « sain », donc seulement
+# −20 % — alors que 1257 dormaient en vente, soit **210 ans** d'écoulement. Les années de
+# stock, elles, ne se laissent tromper par aucun des deux : 2,5 ans pour la commune, 210
+# pour celle-là.
+#
+# En deçà de SOFT, aucune décote. Entre SOFT et DEAD, on descend linéairement jusqu'à
+# SUPPLY_FLOOR. Au-delà, le plancher. Zéro vente = stock infini = plancher.
+SUPPLY_ADJUST = True
+SUPPLY_YEARS_SOFT = 10.0
+SUPPLY_YEARS_DEAD = 40.0
+SUPPLY_FLOOR = 0.15
 # Predictive thin-demand haircut (an ASSUMPTION, layered on the real erosion signal above):
 # a part that barely sells — few actual sales in 6 months — has soft demand, so its high
 # scarcity price won't hold and will drift down further. We discount it by how far its

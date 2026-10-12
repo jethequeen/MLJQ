@@ -75,6 +75,36 @@ def set_value(catalog, pg, set_no, include_extras=False):
         weighted_ratio=(wr_num / wr_den if wr_den else 0.0))
 
 
+def supply_years(rec):
+    """Années nécessaires pour écouler ce qui est en vente, au rythme des 6 derniers mois.
+
+    `inf` quand rien ne s'est vendu : on ne divise pas par zéro, et « jamais » est bien la
+    réponse. `None` quand rien n'est en vente — pas de stock, donc pas de problème de
+    stock."""
+    listed = rec.current_qty_new
+    if not listed:
+        return None
+    sold = rec.past_six_qty_new
+    return float("inf") if sold <= 0 else listed / (sold * 2.0)
+
+
+def supply_factor(rec):
+    """La part de valeur que garde une pièce vu son stock. 1.0 = intacte."""
+    if not getattr(config, "SUPPLY_ADJUST", False):
+        return 1.0
+    yrs = supply_years(rec)
+    if yrs is None:
+        return 1.0
+    soft = float(config.SUPPLY_YEARS_SOFT)
+    dead = max(float(config.SUPPLY_YEARS_DEAD), soft + 1e-9)
+    floor = float(config.SUPPLY_FLOOR)
+    if yrs <= soft:
+        return 1.0
+    if yrs >= dead:
+        return floor
+    return 1.0 - (1.0 - floor) * (yrs - soft) / (dead - soft)
+
+
 def market_realization(catalog, pg, set_no):
     """Fraction of the part-out you'd realistically realize (0..1]. Two haircuts per part:
     (1) EROSION — real data: if a part is already listed BELOW what it recently sold for,
@@ -102,9 +132,15 @@ def market_realization(catalog, pg, set_no):
             continue
         cur = rec.current_new_avg                # currently-listed average
         price = min(sold, cur) if cur > 0 else sold          # (1) real erosion
-        if strength > 0:                                     # (2) predicted thin-demand drift
+        # (2) et (3) mesurent LE MÊME FAIT — la demande est molle — par deux chemins. On
+        # prend donc la plus sévère, pas le produit : multiplier deux estimations d'un même
+        # phénomène punit la pièce deux fois pour une seule réalité.
+        soft = 1.0
+        if strength > 0:                                     # (2) thin-demand drift
             health = min(1.0, rec.past_six_qty_new / healthy)
-            price *= max(floor, 1.0 - strength * (1.0 - health))
+            soft = max(floor, 1.0 - strength * (1.0 - health))
+        soft = min(soft, supply_factor(rec))                 # (3) années de stock
+        price *= soft
         base += part.qty * sold
         adjusted += part.qty * price
     return adjusted / base if base > 0 else 1.0
