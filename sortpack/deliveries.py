@@ -65,6 +65,19 @@ def feed():
     return d
 
 
+def _lane(rec):
+    """Le circuit d'un enregistrement — qui expédie, qui livre.
+
+    L'appariement est une INFÉRENCE : une livraison constatée solde l'expédition en attente
+    la plus ancienne. Tant qu'il n'y avait qu'un circuit (Amazon expédie, Intelcom livre),
+    un seul FIFO suffisait. Depuis Costco, non : son courriel de commande attend une
+    livraison Costco, et sans cloisonnement le premier colis Amazon livré l'aurait soldée.
+
+    Les enregistrements d'avant n'ont pas le champ — ils viennent tous d'Amazon, d'où le
+    défaut."""
+    return rec.get("lane") or "amazon"
+
+
 def match(feed_data=None, matched=None):
     """Apparie les livraisons constatées aux expéditions en attente, du plus ancien au plus
     récent. Rend (nouveaux_appariements, état_complet).
@@ -82,8 +95,11 @@ def match(feed_data=None, matched=None):
     for d in sorted(data["deliveries"], key=lambda x: x.get("at") or ""):
         if d.get("id") in done_delivery_ids:
             continue
-        # Une livraison ne peut solder qu'une expédition PARTIE AVANT elle.
-        cand = next((s for s in pending if (s.get("at") or "") <= (d.get("at") or "")), None)
+        # Une livraison ne peut solder qu'une expédition PARTIE AVANT elle, et venue du
+        # MÊME circuit (voir _lane).
+        cand = next((s for s in pending
+                     if _lane(s) == _lane(d) and (s.get("at") or "") <= (d.get("at") or "")),
+                    None)
         if cand is None:
             continue
         pending.remove(cand)
@@ -93,7 +109,8 @@ def match(feed_data=None, matched=None):
                     "set": cand.get("set"), "qty": cand.get("qty")})
     state.setdefault("matches", []).extend(new)
     state["generated"] = datetime.datetime.now().isoformat(timespec="seconds")
-    state["pending"] = [{"set": s.get("set"), "qty": s.get("qty"), "shipped_at": s.get("at")}
+    state["pending"] = [{"set": s.get("set"), "qty": s.get("qty"), "shipped_at": s.get("at"),
+                         "lane": _lane(s), "eta": s.get("eta") or ""}
                         for s in pending]
     return new, state
 
@@ -152,8 +169,19 @@ def report(log=print):
                (m["delivered_at"] or "")[:10], m["tracking"]))
     if state.get("pending"):
         log("   encore en route (aucune livraison constatée) :")
+        today = datetime.date.today().isoformat()
         for s in state["pending"]:
-            log("      %-8s ×%-3s parti le %s" % (s["set"], s["qty"], (s["shipped_at"] or "")[:10]))
+            ligne = ("      %-8s ×%-3s parti le %s"
+                     % (s["set"], s["qty"], (s["shipped_at"] or "")[:10]))
+            eta = s.get("eta") or ""
+            if eta:
+                # Costco annonce une date : passée sans courriel de livraison, c'est à
+                # confirmer à la main — aucun transporteur ne nous le dira.
+                ligne += ("   attendu le %s%s"
+                          % (eta, "  ⚠ date passée, à confirmer" if eta < today else ""))
+            elif _lane(s) != "amazon":
+                ligne += "   (aucune date annoncée)"
+            log(ligne)
 
 
 def main():
