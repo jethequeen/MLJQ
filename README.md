@@ -821,11 +821,27 @@ Le client veut toutes les couleurs d'un moule dans **un sous-sac**. Une fois le 
 24 Sacs pour l'exemple, soit ~5 par Sac, le pire étant le Sac 18 avec 14.
 
 Le bouton **Consolidation** (ou `python -m sortpack.batch conso <nom>`) écrit
-`<nom> - consolidation.bsx` dans le dossier du batch. Il ne contient **que ce qu'il y a à
-regrouper** — les moules présents en plusieurs couleurs dans un même Sac. Un moule d'une
-seule couleur n'a rien à consolider, et l'écrire ne ferait que noyer le travail réel : sur
-le batch d'exemple, 47 lignes au lieu de 97. Les Sacs sans aucun moule multi-couleurs
-n'apparaissent pas du tout.
+`<nom> - consolidation.bsx` dans le dossier du batch. Il contient **tous les lots de
+l'envoi**, parce qu'il sert à deux choses à la fois :
+
+* **confectionner les sous-sacs** — les moules présents en plusieurs couleurs dans un même
+  Sac, que le client exige réunis ;
+* **vérifier physiquement** que chaque lot est bien dans son Sac. Un moule d'une seule
+  couleur n'a rien à regrouper, mais il a tout à être retrouvé — et sans lui la passe ne
+  couvrait que 328 lots sur 514.
+
+D'où deux formes de remarque, que le « · » suffit à distinguer (et que `consolidation_state`
+compte séparément) :
+
+```
+Sac 03                                         ← à vérifier, puis rayer
+Sac 03 · 3010 (Dark Bluish Gray, Dark Green)   ← à réunir en sous-sac
+Sac 03 · 3010 (Dark Bluish Gray, Dark Green)
+```
+
+Trié sur Remarks, chaque Sac déroule ses lots à vérifier puis ses sous-sacs, dont les
+couleurs se suivent. Sur l'envoi 1 : **514 lots — 114 sous-sacs sur 23 Sacs, 186 lots à
+vérifier**, et 514 est exactement le compte du maître, donc la couverture est complète.
 
 ```
 4042   Bright Green   x54   Sac 01 · 4042 (Bright Green, Sand Green)

@@ -897,25 +897,33 @@ def consolidation_pass(p):
 # Étiquette des lignes du fichier de consolidation. Le tri texte sur Remarks regroupe
 # d'abord par Sac, puis par moule — donc les couleurs d'un même sous-sac se suivent.
 CONSO_GROUP = "Sac {sac} · {mould} ({colors})"
+# Un lot qui n'a rien à regrouper porte juste son Sac : il est là pour être VÉRIFIÉ, pas
+# refait. Le « · » distingue les deux familles partout ailleurs (consolidation_state).
+CONSO_PLAIN = "Sac {sac}"
 
 
 def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print, p=None):
-    """Le fichier de la passe de consolidation, à ouvrir dans BrickStore.
+    """La liste de fin d'envoi, à ouvrir dans BrickStore : **tous** les lots, avec leur Sac.
 
-    Il ne contient QUE les lots à regrouper : les moules présents en plusieurs couleurs dans
-    un même Sac. Un moule d'une seule couleur n'a rien à consolider — il reste où il est, et
-    l'écrire ici ne ferait que noyer le travail réel.
+    Elle sert à deux choses à la fois, et c'est pour ça qu'elle porte tout :
 
-    Une ligne par lot, avec en Remarks le Sac, le sous-sac à confectionner et les couleurs
-    qui doivent s'y retrouver :
+    * **confectionner les sous-sacs** — les moules présents en plusieurs couleurs dans un
+      même Sac, que le client exige réunis ;
+    * **vérifier physiquement** que chaque lot est bien dans son Sac. Un moule d'une seule
+      couleur n'a rien à regrouper, mais il a tout à être retrouvé, et sans lui la passe ne
+      couvrait que 328 lots sur 514.
 
+    D'où deux formes de remarque, que le « · » suffit à distinguer :
+
+        Sac 03 · 4042 (Bright Green, Sand Green)   ← à réunir en sous-sac
         Sac 03 · 4042 (Bright Green, Sand Green)
-        Sac 03 · 4042 (Bright Green, Sand Green)
+        Sac 03                                      ← à vérifier, puis rayer
 
-    Tu tries sur la colonne Remarks et tu descends Sac par Sac : les couleurs d'un même
-    sous-sac se suivent, puisque l'étiquette est identique sur chacune. C'est la même
-    mécanique que les remarques de tri, avec la même mise en page de colonnes (le GuiState
-    des listes de sacs est injecté), donc rien de neuf à apprendre.
+    Tu tries sur la colonne Remarks et tu descends Sac par Sac : les lots à vérifier d'abord,
+    puis les sous-sacs, dont les couleurs se suivent puisque l'étiquette est identique sur
+    chacune. On supprime les lignes à mesure, et le fichier vide vaut « fini »
+    (`consolidation_state`). Même mise en page que les listes de sacs (le GuiState est
+    injecté), donc rien de neuf à apprendre.
 
     Les lots communs à plusieurs sets du batch sont fusionnés en une ligne — dans le Sac ils
     ne forment qu'un seul lot.
@@ -949,16 +957,18 @@ def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print, p=None):
     for k, s in p["sac_of"].items():
         per_sac.setdefault(s, {}).setdefault(mould_key(k), []).append(k)
 
-    texts, groups, sacs = [], 0, set()
+    texts, groups, sacs, plain = [], 0, set(), 0
     for s in sorted(per_sac):
+        num = f"{int(s):0{config.LABEL_PAD}d}"
         for m, keys in sorted(per_sac[s].items()):
-            if len(keys) < 2:
-                continue                 # une seule couleur : rien à regrouper
-            groups += 1
-            sacs.add(s)
-            colors = ", ".join(sorted(p["meta"][k]["color_name"] or "?" for k in keys))
-            remark = CONSO_GROUP.format(sac=f"{int(s):0{config.LABEL_PAD}d}",
-                                        mould=m[0], colors=colors)
+            if len(keys) >= 2:
+                groups += 1
+                sacs.add(s)
+                colors = ", ".join(sorted(p["meta"][k]["color_name"] or "?" for k in keys))
+                remark = CONSO_GROUP.format(sac=num, mould=m[0], colors=colors)
+            else:
+                remark = CONSO_PLAIN.format(sac=num)
+                plain += 1
             for k in sorted(keys, key=lambda kk: p["meta"][kk]["color_name"] or ""):
                 if k in blocks:
                     texts.append(_emit_item(blocks[k], qty.get(k, 0), remark))
@@ -970,9 +980,10 @@ def build_consolidation_bsx(name, out_dir=None, wdb=None, log=print, p=None):
     doc = bsx.set_gui_state(_document(currency, texts))
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(doc)
-    log(f"Consolidation : {groups} sous-sacs sur {len(sacs)} Sacs, "
-        f"{len(texts)} lots → {path}")
-    return {"path": path, "groups": groups, "sacs": len(sacs), "lots": len(texts)}
+    log(f"Consolidation : {len(texts)} lots — {groups} sous-sacs sur {len(sacs)} Sacs, "
+        f"{plain} lots à vérifier → {path}")
+    return {"path": path, "groups": groups, "sacs": len(sacs), "lots": len(texts),
+            "plain": plain}
 
 
 def consolidation_path(name):
@@ -992,17 +1003,21 @@ def consolidation_state(name):
     """
     path = consolidation_path(name)
     if not os.path.exists(path):
-        return {"path": path, "exists": False, "lots": 0, "groups": 0,
+        return {"path": path, "exists": False, "lots": 0, "groups": 0, "checks": 0,
                 "done": False, "error": False}
     try:
         items = bsx.read_items(path)
     except Exception:
-        return {"path": path, "exists": True, "lots": 0, "groups": 0,
+        return {"path": path, "exists": True, "lots": 0, "groups": 0, "checks": 0,
                 "done": False, "error": True}
-    groups = {(it.get("remarks") or "").strip() for it in items}
-    groups.discard("")
+    # Un sous-sac porte « Sac 03 · <moule> (<couleurs>) », un lot à vérifier juste
+    # « Sac 03 » : le séparateur suffit à les compter à part, et le rapport dit les deux.
+    labels = {(it.get("remarks") or "").strip() for it in items}
+    labels.discard("")
+    groups = {l for l in labels if "·" in l}
+    checks = sum(1 for it in items if "·" not in (it.get("remarks") or ""))
     return {"path": path, "exists": True, "lots": len(items), "groups": len(groups),
-            "done": not items, "error": False}
+            "checks": checks, "done": not items, "error": False}
 
 
 def layout_is_final(name, fs=None, done=None):
@@ -1531,8 +1546,8 @@ def preflight(name, cat=None):
         elif cs["error"]:
             blockers.append(f"« {name} - consolidation.bsx » est illisible")
         elif not cs["done"]:
-            blockers.append(f"consolidation : {cs['groups']} sous-sac(s) à faire "
-                            f"({cs['lots']} lots)")
+            blockers.append(f"consolidation : {cs['groups']} sous-sac(s) à faire, "
+                            f"{cs['checks']} lot(s) à vérifier")
 
     return {"batch": name, "ok": not blockers, "blockers": blockers, "auto": auto,
             "notes": notes, "sets": rows, "consolidation": cs,
