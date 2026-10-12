@@ -1370,11 +1370,19 @@ Poids des pièces : 14,21 kg (hors emballage)
 ```
 
 Le poids vient du catalogue BrickStore — le même que Phase A utilise pour remplir les Sacs à
-650 g, donc déjà vérifié par l'usage. Recoupement sur l'envoi 1 : 14,21 kg impose au moins
-22 Sacs, et Phase A en a produit 23. Une pièce que BrickLink ne pèse pas compte pour zéro, et
-ces trous sont comptés à part (« hors 3 lot(s) sans poids au catalogue ») : un total
-d'étiquetage qui se tait sur ce qu'il ignore fait sous-déclarer le colis. Sur l'envoi 1 la
-couverture est complète.
+650 g, donc déjà vérifié par l'usage. **Recoupement sur l'envoi 1**, par trois chemins écrits
+séparément :
+
+| | |
+|---|---|
+| total du plan Phase A (`plan_previsionnel.json`) | 14 207,7 g |
+| somme de ses **25** Sacs | 14 207,8 g (0,1 g d'arrondi) |
+| pesée du maître (`finalize.weigh`) | 14 207,7 g |
+
+Une pièce que BrickLink ne pèse pas compte pour zéro, et ces trous sont comptés à part
+(« hors 3 lot(s) sans poids au catalogue ») : un total d'étiquetage qui se tait sur ce qu'il
+ignore fait sous-déclarer le colis. Sur l'envoi 1 la couverture est complète — 0 pièce sans
+poids, aucun Sac au-dessus de la limite.
 
 Conséquence sur la vérification : **elle ne compare plus les listes au catalogue du tout.**
 L'écart de cataloguage ne voyage plus jusqu'au client, donc il n'a rien à faire dans un
