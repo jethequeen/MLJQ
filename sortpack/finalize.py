@@ -128,6 +128,46 @@ def _validate_before_build(set_folder, log):
     return report, warnings
 
 
+def weigh(lots, wdb=None):
+    """(grammes, lots sans poids, pièces sans poids) pour [(item_id, item_name, qty)].
+
+    Le poids vient du catalogue BrickStore — le même que Phase A utilise pour remplir les
+    Sacs à 650 g, donc déjà vérifié par l'usage. Une pièce que BrickLink ne pèse pas compte
+    pour zéro, et on compte ces trous séparément : un total d'étiquetage qui se tait sur ce
+    qu'il ignore fait sous-déclarer le colis."""
+    if wdb is None:
+        from .weightdb import WeightDB
+        wdb = WeightDB()
+    grams, nolot, noqty = 0.0, 0, 0
+    for item_id, item_name, qty in lots:
+        w = wdb.weight(item_id, item_name)
+        if not w:
+            nolot += 1
+            noqty += qty
+            continue
+        grams += w * qty
+    return grams, nolot, noqty
+
+
+def weight_line(grams, nolot=0, noqty=0):
+    """En kg : c'est l'unité du bordereau de Poste Canada."""
+    txt = ("%.2f kg" % (grams / 1000.0)).replace(".", ",")
+    if nolot:
+        txt += f" — hors {nolot} lot(s) sans poids au catalogue ({noqty} pièces)"
+    return txt
+
+
+def summary_message(res):
+    """Le corps du courriel : de quoi étiqueter le colis sans ouvrir le fichier."""
+    lines = [f"{res['master_lots']} lots · {res['master_qty']} pièces"]
+    if res.get("weight_g"):
+        lines.append("Poids des pièces : "
+                     + weight_line(res["weight_g"], res.get("weight_unknown_lots", 0),
+                                   res.get("weight_unknown_qty", 0))
+                     + " (hors emballage)")
+    return "\n".join(lines)
+
+
 class _MergedLot(object):
     """Un lot du maitre : une piece, une couleur, la quantite cumulee sur tout l'envoi.
 
@@ -191,14 +231,17 @@ def build_from_catalog(sets, out_dir=None, name=None, cat=None, log=None):
         log(f"   {set_no} x{mult} : {len(parts)} lots, {n} pieces")
 
     lots = [merged[k] for k in order]
+    grams, nolot, noqty = weigh([(l.item_id, l.item_name, l.qty) for l in lots])
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{name}.bsx")
     bsx.write_inventory(path, lots)
     qty = sum(l.qty for l in lots)
-    log(f"Maitre (reimport) : {len(lots)} lots, {qty} pieces -> {path}")
+    log(f"Maitre (reimport) : {len(lots)} lots, {qty} pieces, "
+        f"{weight_line(grams, nolot, noqty)} -> {path}")
     return {"path": path, "master_path": path, "master_lots": len(lots),
             "master_qty": qty, "set_number": name, "warnings": [],
-            "source": "catalogue"}
+            "source": "catalogue", "weight_g": grams,
+            "weight_unknown_lots": nolot, "weight_unknown_qty": noqty}
 
 
 def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
@@ -248,6 +291,7 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
 
     present = {}                       # key -> [qty, representative_block]
     order_present = []
+    names = {}                         # key -> item_name, pour la pesée
     for _, path, items in files:
         blocks, _ = bsx.read_item_blocks(path)
         for it in items:
@@ -255,6 +299,7 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
             if key not in present:
                 present[key] = [0, blocks[it["row"]]]
                 order_present.append(key)
+                names[key] = it["item_name"]
             present[key][0] += it["qty"]
 
     currency = _currency(files)
@@ -263,6 +308,7 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
     num = name or set_number(folders[0])
     os.makedirs(out_dir, exist_ok=True)
 
+    _g, _nl, _nq = weigh([(k[0], names.get(k, ""), present[k][0]) for k in order_present])
     master_items = [_emit_item(present[k][1], present[k][0]) for k in order_present]
     master_path = os.path.join(out_dir, f"{num}.bsx")
     with open(master_path, "w", encoding="utf-8", newline="") as f:
@@ -273,6 +319,7 @@ def build_cfb_files(set_folder, out_dir=None, log=None, check=None, name=None):
         "master_path": master_path,
         "master_lots": len(order_present),
         "master_qty": sum(present[k][0] for k in order_present),
+        "weight_g": _g, "weight_unknown_lots": _nl, "weight_unknown_qty": _nq,
         "included_inventory": bool(inv_path),
         "bags": len(bags),
         "verify": vreport,

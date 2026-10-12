@@ -1361,6 +1361,21 @@ diffère — les 3 fautes de frappe, justement :
 Prix et catégorie sont volontairement omis (`bsx.write_inventory`) : BrickStore les remplit
 depuis sa propre base à l'ouverture, et le client refait son prix de toute façon.
 
+**Le courriel porte le poids** (`finalize.weigh` / `summary_message`), pour générer le
+bordereau de Poste Canada sans ouvrir le fichier :
+
+```
+514 lots · 25563 pièces
+Poids des pièces : 14,21 kg (hors emballage)
+```
+
+Le poids vient du catalogue BrickStore — le même que Phase A utilise pour remplir les Sacs à
+650 g, donc déjà vérifié par l'usage. Recoupement sur l'envoi 1 : 14,21 kg impose au moins
+22 Sacs, et Phase A en a produit 23. Une pièce que BrickLink ne pèse pas compte pour zéro, et
+ces trous sont comptés à part (« hors 3 lot(s) sans poids au catalogue ») : un total
+d'étiquetage qui se tait sur ce qu'il ignore fait sous-déclarer le colis. Sur l'envoi 1 la
+couverture est complète.
+
 Conséquence sur la vérification : **elle ne compare plus les listes au catalogue du tout.**
 L'écart de cataloguage ne voyage plus jusqu'au client, donc il n'a rien à faire dans un
 rapport qui sert à décider si l'envoi peut partir — et `preflight` s'épargne du même coup le

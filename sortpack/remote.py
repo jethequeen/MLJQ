@@ -393,7 +393,8 @@ def _do_build_cfb(folder, email):
                            f"batch (bouton « Construire le CFB du batch » sur le PC)")
     lines = []
     res = finalize.build_cfb_files(folder, log=lines.append)
-    msg = (f"CFB : {res['master_lots']} lots / {res['master_qty']} pièces"
+    msg = (f"CFB : {res['master_lots']} lots / {res['master_qty']} pièces, "
+           f"{finalize.weight_line(res.get('weight_g') or 0)}"
            f"{' + inventaire' if res.get('included_inventory') else ''}.")
     # What the pre-send check did travels back to the phone: a rescaled inventory or an
     # uncorrected gap changes what is in that master, so it must not stay in a log nobody
@@ -402,7 +403,8 @@ def _do_build_cfb(folder, email):
         msg += " " + w
     if email and config.CFB_APPS_SCRIPT_URL:
         reply = finalize.email_files([res["master_path"]],
-                                    subject=f"CFB — set {res['set_number']}")
+                                    subject=f"CFB — set {res['set_number']}",
+                                    message=finalize.summary_message(res))
         msg += f" Courriel envoyé ({reply})."
         # The set is out the door, so finish it exactly as the desktop would. Only ever
         # after a mail that actually went: a build alone changes nothing.
@@ -465,12 +467,14 @@ def _do_batch_cfb(name, email):
     lines = []
     res = _batch.build_cfb(name, log=lines.append)
     msg = (f"CFB envoi « {name} » : {res['master_lots']} lots / "
-           f"{res['master_qty']} pièces.")
+           f"{res['master_qty']} pièces, "
+           f"{finalize.weight_line(res.get('weight_g') or 0)}.")
     for w in res.get("warnings", []):
         msg += " " + w
     if email and config.CFB_APPS_SCRIPT_URL:
         reply = finalize.email_files([res["master_path"]],
-                                    subject=f"CFB — batch {name}")
+                                    subject=f"CFB — batch {name}",
+                                    message=finalize.summary_message(res))
         msg += f" Courriel envoyé ({reply})."
         msg += " Il reste « Marquer livré » sur le PC quand le colis part."
     elif email:

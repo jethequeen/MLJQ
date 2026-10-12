@@ -1139,13 +1139,16 @@ class App:
             for w in res.get("warnings", []):
                 self.log(w)
             self.log(f"=== Batch « {name} » ===")
-            self.log(f"Maître : {res['master_lots']} lots, {res['master_qty']} pièces")
+            self.log(f"Maître : {res['master_lots']} lots, {res['master_qty']} pièces, "
+                     f"{finalize.weight_line(res.get('weight_g') or 0)}")
             self.log(f"  → {res['master_path']}")
             paths = [res["master_path"]]
             if config.CFB_APPS_SCRIPT_URL and messagebox.askyesno(
                     "Envoyer par courriel ?",
                     f"Envoyer {len(paths)} fichier(s) à {config.CFB_EMAIL_TO} ?"):
-                reply = finalize.email_files(paths, subject=f"CFB — batch {name}")
+                reply = finalize.email_files(
+                    paths, subject=f"CFB — batch {name}",
+                    message=finalize.summary_message(res))
                 self.log(f"\nCourriel : {reply}")
                 self.status(f"Batch envoyé ({reply}).")
                 # Le batch est parti : on propose de le solder, comme le flux par set le
@@ -1643,7 +1646,8 @@ class App:
                         f"Envoyer {len(paths)} fichier(s) à {config.CFB_EMAIL_TO} ?"):
                     self.status("Envoi du courriel…")
                     reply = finalize.email_files(
-                        paths, subject=f"CFB — set {res['set_number']}")
+                        paths, subject=f"CFB — set {res['set_number']}",
+                        message=finalize.summary_message(res))
                     self.log(f"\nCourriel : {reply}")
                     self.status(f"Fichiers écrits et envoyés ({reply}).")
                 else:
