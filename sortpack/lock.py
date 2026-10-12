@@ -34,7 +34,7 @@ _WARNED = None             # who we last told the user was holding the lock
 
 def lock_path():
     return getattr(config, "POLLER_LOCK_FILE",
-                   os.path.join(config.CATALOGUAGE_ROOT, "poller_owner.json"))
+                   config.state_path("poller_owner.json"))
 
 
 def machine_name():

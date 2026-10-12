@@ -47,7 +47,7 @@ from . import bsx
 from .plan import (build_plan, discover_bags, find_inventory, is_set_folder, set_number,
                    mould_key, iter_set_folders, batch_root)
 
-BATCH_FILE = os.path.join(config.CATALOGUAGE_ROOT, "batches.json")
+BATCH_FILE = config.state_path("batches.json")
 
 # Ce que le client demande par envoi. Un batch est « prêt à fermer » une fois atteint.
 TARGET_PIECES = getattr(config, "BATCH_TARGET_PIECES", 20000)
@@ -1176,7 +1176,7 @@ def apply(name, wdb=None, backup=None, log=print):
 # cas où il faut réécrire. Elle ne change pas quand rien n'a bougé : aucun catalogue chargé,
 # aucune sauvegarde, aucune réécriture.
 
-BATCH_APPLY_FILE = os.path.join(config.CATALOGUAGE_ROOT, "batch_apply.json")
+BATCH_APPLY_FILE = config.state_path("batch_apply.json")
 
 
 def _coverage_fingerprint(name):
@@ -1539,10 +1539,51 @@ def preflight(name, cat=None):
             "pieces": st["pieces"], "nsets": len(st["sets"])}
 
 
+def archive_lists(name, log=None):
+    """Copie les listes de l'envoi dans BACKUP_ROOT — une fois, avant la construction.
+
+    Pourquoi ici et nulle part ailleurs : « Marquer livré » envoie les dossiers de sets à la
+    corbeille une fois le colis parti, et c'est le seul moment où le cataloguage — des
+    heures de saisie — cesse d'exister en double. Un snapshot à chaque Apply ne protégeait
+    rien de plus et empilait des dizaines de dossiers dans l'espace de travail."""
+    from .plan import discover_bags, find_inventory
+    dest = os.path.join(config.BACKUP_ROOT,
+                        "%s - %s" % (name, datetime.datetime.now().strftime("%Y-%m-%d")))
+    n = 0
+    for s in get(name).get("sets", []):
+        f = folder_of(s)
+        if not f:
+            continue
+        out = os.path.join(dest, os.path.basename(f))
+        try:
+            os.makedirs(out, exist_ok=True)
+        except OSError as e:
+            if log:
+                log(f"  ⚠ archive impossible pour {s} : {str(e)[:60]}")
+            continue
+        paths = [p for _l, p, _i in discover_bags(f)]
+        inv = find_inventory(f)
+        if inv:
+            paths.append(inv)
+        for p in paths:
+            try:
+                shutil.copy2(p, os.path.join(out, os.path.basename(p)))
+                n += 1
+            except OSError as e:
+                if log:
+                    log(f"  ⚠ {os.path.basename(p)} non archivé : {str(e)[:60]}")
+    if log:
+        log(f"   {n} liste(s) archivée(s) → {dest}" if n
+            else "   aucune liste à archiver")
+    return dest if n else None
+
+
 def build_cfb(name, out_dir=None, log=print):
     """Un seul .bsx pour tout le batch — ce que le client a demandé. Il atterrit dans le
     dossier du batch, à côté du fichier de consolidation."""
     from . import finalize
+    # Les listes partent à la corbeille avec « Marquer livré » : on les archive AVANT.
+    archive_lists(name, log=log)
     out = out_dir or batch_dir(name, create_it=True)
     if getattr(config, "CFB_MASTER_FROM_CATALOG", True):
         # Le contenu physique, pas sa transcription : l'inventaire de chaque set x son

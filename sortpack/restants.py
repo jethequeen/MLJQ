@@ -339,8 +339,7 @@ def write_bag_help(set_folder, wdb=None, plan=None):
     or None when it couldn't be produced (a Drive hiccup must never break an Apply)."""
     try:
         data = bag_help(set_folder, wdb=wdb, plan=plan)
-        path = os.path.join(config.CATALOGUAGE_ROOT,
-                            config.BAG_HELP_FILE.format(set=data["set"]))
+        path = config.state_path(config.BAG_HELP_FILE.format(set=data["set"]))
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=1)
         return path

@@ -470,6 +470,51 @@ jour, on ne recrée jamais.
 (container-bound), donc `clasp list-scripts` ne le voit pas. On l'ouvre depuis la feuille,
 *Extensions ▸ Apps Script*.
 
+## Ce qu'il y a dans `BSX\CFB`, et pourquoi
+
+CFB est un espace de **travail** : on l'ouvre pour trouver une liste ou un envoi. Il portait
+pourtant treize JSON de machinerie, un dossier de sauvegardes et les maîtres déjà expédiés,
+tous mêlés. Depuis le 2026-10-12 il tient en trois dossiers :
+
+```
+BSX\CFB\
+   Batchs\      les envois — leurs sets, leur maître, leur consolidation
+   Maitres\     les maîtres des sets HORS envoi (CFB_OUTPUT_DIR)
+   _app\        l'état de l'application (config.STATE_DIR)
+BSX\Backups\    les archives — hors de l'espace de travail
+```
+
+`_app` tient ce que le PC écrit et que le téléphone lit : `sort_index.json`,
+`set_status.json`, `sort_commands.json`, `dashboard.json`, `batches.json`, les
+`restants_<set>.json`, plus l'état interne (`auto_apply`, `batch_apply`, `deliveries`,
+`poller_owner`).
+
+**La bascule se fait fichier par fichier, pas d'un coup**, parce que deux machines partagent
+ce dossier par Drive et ne tournent pas forcément sur le même code à la même minute. Les deux
+côtés appliquent la même règle — `config.state_path` et `stateFolder_` dans le `.gs` : on lit
+`_app`, et on retombe sur la racine quand le fichier n'est QUE là. Déplacer un fichier dans
+`_app` suffit donc à y faire basculer tout le monde ; tant qu'il reste à la racine, l'ancien
+code et le nouveau continuent de tenir la même vérité.
+
+### Une seule sauvegarde, au moment qui compte
+
+Il y en avait une **à chaque Apply**, et comme l'auto-apply tourne au poll, 73 dossiers et
+7,4 Mo de snapshots s'étaient empilés dans l'espace de travail — pour protéger un geste qu'on
+refait de toute façon.
+
+`ENABLE_BACKUP` est donc à `False`, et `batch.archive_lists` prend **une** copie juste avant
+de construire le maître. C'est le bon moment et le seul : « Marquer livré » envoie ensuite les
+dossiers de sets à la corbeille, et c'est là que le cataloguage — des heures de saisie — cesse
+d'exister en double. L'archive est nommée, pas horodatée :
+
+```
+BSX\Backups\1 - 2026-10-12\11503 - Flower Wall\   (17 listes)
+                            \11381 - Jaguar E-Type\ (27 listes)
+```
+
+La case « sauvegarder » du bureau reste là pour forcer une copie ponctuelle avant un Apply
+qu'on sent risqué.
+
 ## Terminer un set depuis le téléphone
 
 **Construire CFB** on the phone now finishes the set, the way the desktop's

@@ -51,8 +51,8 @@ from . import bsx
 from . import mobile
 from . import lock
 
-COMMANDS_FILE = os.path.join(config.CATALOGUAGE_ROOT, "sort_commands.json")
-AUTO_APPLY_FILE = os.path.join(config.CATALOGUAGE_ROOT, "auto_apply.json")
+COMMANDS_FILE = config.state_path("sort_commands.json")
+AUTO_APPLY_FILE = config.state_path("auto_apply.json")
 # per-set actions (need the set's folder) vs global jobs (the Finances tab's buttons)
 _SET_ACTIONS = ("build_cfb", "restant_done", "restant_move")
 _GLOBAL_ACTIONS = ("sync_purchases", "buy_report", "cfb_inventory", "end_of_month",
@@ -324,7 +324,7 @@ def _prune_phone_files(set_no, log=None):
     poller does not rebuild sort_index.json (the desktop does), so its row is removed here —
     otherwise the phone would keep listing a set with no folder behind it."""
     try:
-        p = os.path.join(config.CATALOGUAGE_ROOT, config.BAG_HELP_FILE.format(set=set_no))
+        p = config.state_path(config.BAG_HELP_FILE.format(set=set_no))
         if os.path.exists(p):
             os.remove(p)
     except OSError:

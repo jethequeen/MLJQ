@@ -86,7 +86,7 @@ def origin_sacs(num):
     Ce qui reste introuvable était un restant placé à l'œil : on le dit, plutôt que d'inventer
     un numéro. Renvoie {clé: numéro de Sac ou None}."""
     from .plan import discover_bags, find_inventory, existing_sacs
-    bk = os.path.join(config.CATALOGUAGE_ROOT, "backups")
+    bk = config.BACKUP_ROOT
     if not os.path.isdir(bk):
         return {}
     best, best_n, invs = None, 0, []

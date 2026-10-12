@@ -61,19 +61,39 @@ function doGet() {
 // ── Drive JSON helpers ───────────────────────────────────────────────────────
 function cfbFolder_() { return DriveApp.getFolderById(CFB_FOLDER_ID); }
 
+// Les JSON d'etat vivent dans le sous-dossier _app (config.STATE_DIR cote PC) : CFB est un
+// espace de TRAVAIL — les listes, les envois — et une dizaine de fichiers de machinerie au
+// milieu le rendaient illisible. On retombe sur la racine quand _app n'existe pas : le PC
+// et le telephone ne basculent pas forcement a la meme minute, et un fichier LU a l'ancien
+// endroit vaut mieux qu'un ecran vide.
+var STATE_DIR_NAME = '_app';
+function stateFolder_() {
+  var root = cfbFolder_();
+  var it = root.getFoldersByName(STATE_DIR_NAME);
+  return it.hasNext() ? it.next() : root;
+}
+
 function readJson_(name) {
-  var it = cfbFolder_().getFilesByName(name);
+  var it = stateFolder_().getFilesByName(name);
+  if (!it.hasNext()) it = cfbFolder_().getFilesByName(name);   // repli : ancienne place
   if (!it.hasNext()) return null;
   try { return JSON.parse(it.next().getBlob().getDataAsString('UTF-8')); }
   catch (e) { return null; }
 }
 
 function writeJson_(name, obj) {
-  var folder = cfbFolder_();
-  var it = folder.getFilesByName(name);
   var s = JSON.stringify(obj, null, 2);
-  if (it.hasNext()) it.next().setContent(s);
-  else folder.createFile(name, s, 'application/json');
+  // On ecrit LA OU LE FICHIER EST : ecrire une copie neuve dans _app pendant que le PC lit
+  // encore la racine donnerait deux verites. Sans fichier nulle part, il nait dans _app.
+  var folder = stateFolder_();
+  var it = folder.getFilesByName(name);
+  if (it.hasNext()) { it.next().setContent(s); return; }
+  var root = cfbFolder_();
+  if (folder.getId() !== root.getId()) {
+    var old = root.getFilesByName(name);
+    if (old.hasNext()) { old.next().setContent(s); return; }
+  }
+  folder.createFile(name, s, 'application/json');
 }
 
 // ── API called from the page via google.script.run ───────────────────────────

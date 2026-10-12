@@ -253,8 +253,42 @@ CATALOGUAGE_ROOT = os.path.join(DRIVE_ROOT, "BSX", "CFB")
 # run subfolder mirroring the set folder), so a pristine pre-write copy always
 # exists. Set ENABLE_BACKUP = False to skip. Kept inside BSX\CFB so everything is
 # centralized in one Google Drive folder.
-ENABLE_BACKUP = True
-BACKUP_ROOT = os.path.join(CATALOGUAGE_ROOT, "backups")
+# Plus de sauvegarde à chaque Apply. L'auto-apply tourne au poll, et 73 dossiers / 7,4 Mo
+# de snapshots s'étaient empilés dans l'espace de travail pour protéger un geste qu'on
+# refait de toute façon. Il en reste UNE, au moment qui compte : juste avant de construire
+# le maître (`batch.archive_lists`), donc avant que « Marquer livré » envoie les dossiers de
+# sets à la corbeille. C'est le seul moment où le cataloguage cesse d'exister en double.
+# La case du bureau reste là pour forcer une sauvegarde ponctuelle.
+ENABLE_BACKUP = False
+# Hors de CFB : une archive n'est pas un espace de travail.
+BACKUP_ROOT = os.path.join(os.path.dirname(CATALOGUAGE_ROOT), "Backups")
+
+# Les JSON d'état de l'application (index, statuts, file de commandes, tableau de bord…)
+# vivent ici plutôt qu'en vrac dans CFB. CFB est un espace de TRAVAIL — les listes, les
+# envois — et onze fichiers de machinerie au milieu le rendaient illisible.
+STATE_DIR = os.path.join(CATALOGUAGE_ROOT, "_app")
+
+
+def state_path(name):
+    """Chemin d'un fichier d'état, le dossier créé au besoin.
+
+    Deux replis, et tous deux sur l'ANCIENNE place (la racine de CFB) :
+
+    * le sous-dossier est impossible à créer — mieux vaut l'ancienne disposition qu'un
+      plantage au démarrage ;
+    * le fichier n'existe QUE dans l'ancienne place. On l'y laisse alors, et on y écrit :
+      sinon une machine restée sur l'ancien code et une machine à jour se mettraient à
+      tenir deux vérités sur le même fichier partagé. Le `.gs` applique exactement la même
+      règle, pour que le téléphone suive. Déplacer le fichier dans `_app` suffit à faire
+      basculer tout le monde."""
+    try:
+        os.makedirs(STATE_DIR, exist_ok=True)
+    except OSError:
+        return os.path.join(CATALOGUAGE_ROOT, name)
+    here, there = os.path.join(STATE_DIR, name), os.path.join(CATALOGUAGE_ROOT, name)
+    if not os.path.exists(here) and os.path.exists(there):
+        return there
+    return here
 
 # --- Bagging (Phase A: final "Sac" assignment) -------------------------------
 # Target weight per outgoing bag, in grams (~650 g). A bag is closed once adding the next
@@ -567,11 +601,11 @@ VERIFY_MAX_QTY_FRACTION = 0.25    # share of the set's pieces allowed to differ
 # remembered here, keyed by set number, e.g. {"42680": {"status": "Trier", "bags_done": [1]}}.
 # It lives INSIDE the CFB folder (on Google Drive) so the phone web-app can read/write the
 # same file: bag check-offs sync both ways between the desktop and the phone via Drive.
-SET_STATUS_FILE = os.path.join(CATALOGUAGE_ROOT, "set_status.json")
+SET_STATUS_FILE = state_path("set_status.json")
 # A small snapshot the desktop writes on every refresh (set name, number, base status and
 # bag count per set), so the phone web-app can list the sets without parsing any .bsx. Also
 # in the CFB folder. Read-only for the phone; rewritten each desktop refresh.
-SORT_INDEX_FILE = os.path.join(CATALOGUAGE_ROOT, "sort_index.json")
+SORT_INDEX_FILE = state_path("sort_index.json")
 # Per-set helper the phone reads while sorting a numbered bag: the leftovers list with its
 # physical quantities, each one's destination Sac, and the bags that still hold that part or
 # its sister colours - enough for the phone to answer "I'm at bag N, where does this go?"
@@ -584,7 +618,7 @@ BAG_HELP_FILE = "restants_{set}.json"
 # status and the freshness ages. Same folder, same read-only contract (sortpack/mobile.py).
 # It is rebuilt after every processed phone command and, at most every
 # MOBILE_DASHBOARD_REFRESH_SECONDS, by the desktop poll.
-MOBILE_DASHBOARD_FILE = os.path.join(CATALOGUAGE_ROOT, "dashboard.json")
+MOBILE_DASHBOARD_FILE = state_path("dashboard.json")
 MOBILE_DASHBOARD_REFRESH_SECONDS = 600
 # How many non-chosen candidates ride along after the monthly batch (the phone's "voir tout").
 # 0 = all of them — the Achats tab searches/filters/sorts the whole ranking, so it needs the
@@ -612,7 +646,7 @@ REMOTE_POLL_SECONDS = 25
 # never stalls for good. Courtesy lock, not a mutex - Drive latency means a simultaneous
 # start can still overlap; nothing destructive rests on it alone.
 POLLER_LOCK = True
-POLLER_LOCK_FILE = os.path.join(CATALOGUAGE_ROOT, "poller_owner.json")
+POLLER_LOCK_FILE = state_path("poller_owner.json")
 POLLER_MACHINE_NAME = ""          # blank = this machine's hostname
 POLLER_LOCK_STALE_MINUTES = 10    # a lock this cold may be taken over
 POLLER_HEARTBEAT_SECONDS = 120    # how often the owner re-stamps it (Drive write)
@@ -686,8 +720,10 @@ CFB_MULTIPLY_FROM_SHEET = True
 CFB_MASTER_FROM_CATALOG = True
 
 # --- CFB finalizer (Phase C: build the file to send to Canada First Brick) -----
-# Where the master "<set-number>.bsx" is written when you hit "Construire fichier CFB".
-CFB_OUTPUT_DIR = CATALOGUAGE_ROOT
+# Le maitre d'un set HORS ENVOI. Dans son propre dossier : a la racine de CFB il se melait
+# aux dossiers de travail, et on ne distinguait plus ce qui est parti de ce qui se trie.
+# (Le maitre d'un envoi, lui, reste dans le dossier de l'envoi, avec sa consolidation.)
+CFB_OUTPUT_DIR = os.path.join(CATALOGUAGE_ROOT, "Maitres")
 
 # --- Emailing the CFB files via a Google Apps Script Web App -------------------
 # Deploy the Apps Script (see appscript/CFB_email.gs) as a Web App, then paste its

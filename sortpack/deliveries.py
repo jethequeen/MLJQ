@@ -35,10 +35,10 @@ import datetime
 
 from . import config
 
-DELIVERIES_FILE = os.path.join(config.CATALOGUAGE_ROOT, "deliveries.json")
+DELIVERIES_FILE = config.state_path("deliveries.json")
 # Les appariements déjà faits, pour qu'une livraison ne solde pas deux fois et qu'on puisse
 # relire après coup ce qui a été déduit de quoi.
-MATCHES_FILE = os.path.join(config.CATALOGUAGE_ROOT, "deliveries_matched.json")
+MATCHES_FILE = config.state_path("deliveries_matched.json")
 
 
 def _read(path, default):
