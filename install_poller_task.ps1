@@ -45,20 +45,27 @@ $action = New-ScheduledTaskAction -Execute 'wscript.exe' `
                                   -Argument ('"{0}"' -f $lanceur) `
                                   -WorkingDirectory $PSScriptRoot
 
-# Declencheur: ouverture de session de CET utilisateur, + 2 min pour laisser monter Drive.
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-$trigger.Delay = 'PT2M'
-
-# Repetition: toutes les N minutes, SANS FIN. On emprunte l'objet Repetition d'un
-# declencheur "once", la seule facon propre de l'exprimer en PowerShell 5.1.
+# DEUX declencheurs, et il en faut deux.
+#
+#  1. "once", a maintenant, qui se repete toutes les N minutes sans fin. C'est lui qui
+#     fait tourner la tache, et il demarre DES L'INSTALLATION.
+#  2. "a l'ouverture de session", +2 min, pour repartir apres un redemarrage (le delai
+#     laisse Google Drive monter le lecteur, sans quoi il n'y a rien a lire).
+#
+# Le premier est indispensable: un declencheur d'ouverture de session NE SE DECLENCHE PAS
+# quand on installe la tache, il attend la prochaine ouverture de session. Sa repetition ne
+# demarrait donc jamais, et la tache ne tournait que si on la lancait a la main.
 #
 # Et on NE PASSE PAS -RepetitionDuration: "indefiniment" s'exprime par l'ABSENCE de duree
-# dans le XML de la tache. [TimeSpan]::MaxValue, que la doc suggere, produit
-# P99999999DT23H59M59S, que le planificateur refuse net:
-#   "The task XML contains a value which is incorrectly formatted or out of range."
-$modele = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-                                   -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
-$trigger.Repetition = $modele.Repetition
+# dans le XML. [TimeSpan]::MaxValue, que la doc suggere, produit P99999999DT23H59M59S, que
+# le planificateur refuse net ("value which is incorrectly formatted or out of range").
+$maintenant = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
+                                       -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
+
+$auDemarrage = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+$auDemarrage.Delay = 'PT2M'
+
+$trigger = @($maintenant, $auDemarrage)
 
 # IgnoreNew: si une passe deborde sur la suivante, on ne la double pas. Le verrou local
 # (lock.single_instance) dit la meme chose cote Python - deux filets valent mieux qu'un,

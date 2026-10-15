@@ -318,6 +318,30 @@ def _do_restant_move(folder, payload, wdb):
     return msg + _earlier_note(res)
 
 
+def refresh_phone_index(log=None):
+    """Réécrit `sort_index.json` — la liste de sets que le téléphone affiche.
+
+    Elle ne se construisait que dans le GUI, et ça tenait tant que le GUI était la seule
+    façon de faire tourner le poller. Depuis la tâche planifiée, non : GUI fermé, la liste
+    du téléphone GELAIT. Un set fraîchement catalogué n'apparaissait pas, les compteurs de
+    sacs ne bougeaient plus, la pastille de consolidation restait sur son dernier chiffre —
+    pendant que la file, elle, continuait d'être traitée. Le pire des symptômes : tout a
+    l'air de marcher.
+
+    L'import est TARDIF et gardé. `gui` tire tkinter (3 s au chargement, aucune fenêtre
+    ouverte), et un poller qui n'arriverait pas à le charger doit continuer de traiter la
+    file plutôt que de s'arrêter là. Le tableau de bord, lui, a toujours été rafraîchi ici
+    (`mobile.maybe_write_dashboard`) — c'est pour ça que seuls les sets gelaient."""
+    try:
+        import gui as _gui
+        _gui._write_sort_index(_gui.build_index())
+        return True
+    except Exception as e:
+        if log:
+            log(f"  ⚠ index du téléphone non réécrit ({str(e)[:80]})")
+        return False
+
+
 def _prune_phone_files(set_no, log=None):
     """Drop the derived files that outlive a set whose folder is gone: its leftovers helper,
     and its row in the phone's index / the sorting status / the auto-apply tracking. The
@@ -861,8 +885,12 @@ def main():
     done, errors = process_pending(backup=backup, email=email, force=args.take_lock)
     applied = 0 if args.no_auto_apply else auto_apply_ready(backup=backup)
     mobile.maybe_write_dashboard()      # keep the phone's Finances tab from going stale
+    # ... et la liste des sets, que seul le GUI écrivait. Sans elle, GUI fermé, le
+    # téléphone affiche indéfiniment la photo du jour où on l'a fermé.
+    idx = refresh_phone_index(log=print) if lock.owns() else False
     print(f"queue: done={done} errors={errors} pending_left={pending_count()} | "
-          f"auto_applied={applied} | {lock.describe()}")
+          f"auto_applied={applied} | index={'réécrit' if idx else 'inchangé'} "
+          f"| {lock.describe()}")
 
 
 if __name__ == "__main__":

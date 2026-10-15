@@ -877,7 +877,7 @@ def main():
 
     wdb = WeightDB()
     for folder in folders:
-        name = os.path.basename(folder.rstrip("\/"))
+        name = os.path.basename(folder.rstrip(r"\/"))
         try:
             data = bag_help(folder, wdb=wdb)
             path = write_bag_help(folder, wdb=wdb)
