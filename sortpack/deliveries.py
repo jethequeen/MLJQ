@@ -97,8 +97,17 @@ def match(feed_data=None, matched=None):
             continue
         # Une livraison ne peut solder qu'une expédition PARTIE AVANT elle, et venue du
         # MÊME circuit (voir _lane).
+        #
+        # Et quand la livraison NOMME son set — Costco écrit la ligne produit dans son
+        # courriel « was delivered » — on n'infère plus rien : seul ce set-là peut être
+        # soldé. L'inférence du plus ancien ne sert que là où le transporteur se tait
+        # (Intelcom ne dit jamais ce qu'il livre), et elle se trompe le jour où deux colis
+        # arrivent dans le désordre. Autant ne pas s'en servir quand on sait.
+        want = str(d.get("set") or "")
         cand = next((s for s in pending
-                     if _lane(s) == _lane(d) and (s.get("at") or "") <= (d.get("at") or "")),
+                     if _lane(s) == _lane(d)
+                     and (not want or str(s.get("set") or "") == want)
+                     and (s.get("at") or "") <= (d.get("at") or "")),
                     None)
         if cand is None:
             continue

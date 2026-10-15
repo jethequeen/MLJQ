@@ -91,6 +91,17 @@ function parseEta_(body, emailDate, tz) {
   return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
 }
 
+/** Le numero de suivi d'un courriel Costco. UPS (« 1Z... ») en priorite, sinon ce qui suit
+ *  le nom du transporteur. Purement informatif : l'appariement, lui, se fait sur le set. */
+function parseTracking_(body) {
+  if (!body) return '';
+  var m = String(body).match(/\b1Z[0-9A-Z]{16}\b/);
+  if (m) return m[0];
+  m = String(body).match(/(?:United Parcel Service|Purolator|FedEx|Canada Post|Postes Canada|UPS)\s*:?\s*([A-Z0-9]{8,})/i);
+  return m ? m[1] : '';
+}
+
+
 /** Le set et la quantite d'une confirmation Costco, lus dans le CORPS.
  *
  *  La ligne produit finit par la reference LEGO (« ... Race Car 42226 »), comme chez Amazon.
@@ -134,26 +145,37 @@ function scanDeliveries() {
     });
   });
 
-  // Costco : la confirmation de commande vaut expedition, avec sa date estimee.
+  // Costco, en deux temps : la CONFIRMATION de commande vaut expedition (avec sa date
+  // estimee), et le courriel « was delivered » vaut livraison. Les deux portent la ligne
+  // produit, donc les deux NOMMENT le set — pas besoin d'inferer quoi que ce soit ici.
+  var costcoDeliveries = [];
   GmailApp.search(COSTCO_QUERY + after, 0, 100).forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       var subject = msg.getSubject() || '';
-      if (!/confirm/i.test(subject)) return;
+      var livre = /deliver|livr/i.test(subject);
+      if (!livre && !/confirm/i.test(subject)) return;
       var body = '';
       try { body = msg.getPlainBody() || ''; } catch (e) { body = ''; }
       var p = parseCostco_(body);
       if (!p) return;
-      shipments.push({
-        set: p.set, qty: p.qty,
+      var base = {
         date: Utilities.formatDate(msg.getDate(), tz, 'yyyy-MM-dd'),
         at: Utilities.formatDate(msg.getDate(), tz, "yyyy-MM-dd'T'HH:mm:ss"),
-        id: msg.getId(), subject: subject.slice(0, 160), source: 'costco',
-        lane: 'costco', eta: parseEta_(body, msg.getDate(), tz)
-      });
+        id: msg.getId(), subject: subject.slice(0, 160), lane: 'costco'
+      };
+      if (livre) {
+        base.set = p.set; base.qty = p.qty; base.source = 'costco';
+        base.tracking = parseTracking_(body);
+        costcoDeliveries.push(base);
+      } else {
+        base.set = p.set; base.qty = p.qty; base.source = 'costco';
+        base.eta = parseEta_(body, msg.getDate(), tz);
+        shipments.push(base);
+      }
     });
   });
 
-  var deliveries = [];
+  var deliveries = costcoDeliveries.slice();
   GmailApp.search(DELIVERED_QUERY + after, 0, 100).forEach(function (thread) {
     thread.getMessages().forEach(function (msg) {
       var subject = msg.getSubject() || '';
