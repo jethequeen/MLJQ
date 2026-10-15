@@ -49,11 +49,15 @@ $action = New-ScheduledTaskAction -Execute 'wscript.exe' `
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $trigger.Delay = 'PT2M'
 
-# Repetition: toutes les N minutes, sans fin. On emprunte l'objet Repetition d'un
+# Repetition: toutes les N minutes, SANS FIN. On emprunte l'objet Repetition d'un
 # declencheur "once", la seule facon propre de l'exprimer en PowerShell 5.1.
+#
+# Et on NE PASSE PAS -RepetitionDuration: "indefiniment" s'exprime par l'ABSENCE de duree
+# dans le XML de la tache. [TimeSpan]::MaxValue, que la doc suggere, produit
+# P99999999DT23H59M59S, que le planificateur refuse net:
+#   "The task XML contains a value which is incorrectly formatted or out of range."
 $modele = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-                                   -RepetitionInterval (New-TimeSpan -Minutes $Minutes) `
-                                   -RepetitionDuration ([TimeSpan]::MaxValue)
+                                   -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
 $trigger.Repetition = $modele.Repetition
 
 # IgnoreNew: si une passe deborde sur la suivante, on ne la double pas. Le verrou local
