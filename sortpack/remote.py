@@ -601,6 +601,12 @@ def process_pending(log=print, backup=True, email=None, wdb=None, force=False):
         lock.acquire(force=True, log=log)
     elif not lock.owns(log=log):
         return 0, 0
+    # Deux processus de CETTE machine ne traitent pas la file ensemble : le verrou de Drive
+    # arbitre entre machines, pas entre le GUI ouvert et la tâche planifiée. Sans ça, les
+    # deux voient la même commande « pending » et la font chacun de leur côté.
+    if lock.single_instance() is None:
+        log("⏸ une autre passe tourne déjà sur cette machine — rien à faire.")
+        return 0, 0
     if email is None:
         email = getattr(config, "REMOTE_CFB_EMAIL", False)
 

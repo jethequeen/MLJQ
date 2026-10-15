@@ -470,6 +470,42 @@ jour, on ne recrée jamais.
 (container-bound), donc `clasp list-scripts` ne le voit pas. On l'ouvre depuis la feuille,
 *Extensions ▸ Apps Script*.
 
+## Le poller en tâche planifiée (et la fin des redémarrages)
+
+Le GUI traitait la file du téléphone tant qu'il était ouvert — et gardait ses modules Python
+**en mémoire**. Toute modification du code demandait donc un redémarrage à la main sur la
+machine propriétaire, ce qui était la friction numéro un du projet.
+
+`install_poller_task.ps1`, lancé **sur la machine propriétaire**, installe une tâche qui
+exécute `process_remote.bat` à l'ouverture de session puis toutes les 5 minutes :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\install_poller_task.ps1"
+```
+
+**Un processus neuf à chaque passage relit le code depuis Drive** : une modification prend
+effet au prochain tour, sans rien redémarrer, et sans que le GUI ait à être ouvert.
+
+Quatre choix qui ont chacun une raison :
+
+* **à l'ouverture de session, pas au démarrage** — le projet vit sur Google Drive, et `G:`
+  n'existe que dans une session ouverte. Une tâche lancée au boot ne trouverait rien. D'où
+  aussi le délai de 2 minutes, le temps que Drive monte ;
+* **par `run_poller_hidden.vbs`** — sans lui, une console noire clignoterait toutes les
+  5 minutes sur la machine où l'on travaille ;
+* **seulement sur la machine propriétaire** — le script refuse de s'installer ailleurs. À
+  l'exécution, `lock.owns()` protège déjà : un autre poste se retire tout seul ;
+* **`lock.single_instance`**, un verrou local, parce que celui de Drive arbitre entre
+  MACHINES. Il laissait passer le GUI ouvert ET la tâche planifiée du même PC, qui auraient
+  vu la même commande « pending » et l'auraient faite tous les deux — deux maîtres
+  construits, deux courriels au client.
+
+Les trois fichiers sont en **ASCII sans accents** : `cmd.exe` lit les `.bat` en page de code
+OEM, `wscript` lit les `.vbs` en ANSI, et PowerShell 5.1 lit un `.ps1` sans BOM en ANSI. Un
+seul caractère accentué suffit à casser l'analyse du script entier — c'est arrivé au premier
+jet. Le `.bat` fixe en revanche `PYTHONIOENCODING=utf-8` pour que le journal garde ses
+accents ; il se relit avec `Get-Content reportsemote.log -Encoding UTF8`.
+
 ## Ce qu'il y a dans `BSX\CFB`, et pourquoi
 
 CFB est un espace de **travail** : on l'ouvre pour trouver une liste ou un envoi. Il portait

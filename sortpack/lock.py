@@ -32,6 +32,48 @@ _LAST_BEAT = None          # when this process last wrote the heartbeat (throttl
 _WARNED = None             # who we last told the user was holding the lock
 
 
+# --- le verrou LOCAL, celui qui est un vrai mutex -----------------------------
+#
+# `owns()` ci-dessous arbitre entre MACHINES, par courtoisie, à travers Drive. Il laisse
+# donc passer deux processus de la MÊME machine — typiquement le GUI ouvert et la tâche
+# planifiée qui le remplace. Les deux verraient la même commande « pending » et la feraient
+# tous les deux : deux maîtres construits, deux courriels au client.
+#
+# Celui-ci est local (jamais sur Drive, où un verrou ne veut rien dire) et réel : l'OS tient
+# le fichier, et le relâche même si le processus est tué.
+
+_SINGLE_HANDLE = None
+
+
+def single_instance(name="mljq-poller"):
+    """Prend le verrou local, ou rend None si un autre processus d'ici l'a déjà.
+
+    Le descripteur est gardé dans un global : tant que le processus vit, le verrou tient.
+    On ne le relâche jamais à la main — la fin du processus s'en charge, y compris quand il
+    est tué, ce qu'un fichier-témoin avec un PID ne garantit pas."""
+    global _SINGLE_HANDLE
+    if _SINGLE_HANDLE is not None:
+        return _SINGLE_HANDLE
+    import tempfile
+    path = os.path.join(tempfile.gettempdir(), name + ".lock")
+    try:
+        fh = open(path, "a+b")
+    except OSError:
+        return True                       # pas de dossier temporaire : on ne bloque pas
+    try:
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fh.close()
+        return None                       # déjà pris ici
+    _SINGLE_HANDLE = fh
+    return fh
+
+
 def lock_path():
     return getattr(config, "POLLER_LOCK_FILE",
                    config.state_path("poller_owner.json"))
