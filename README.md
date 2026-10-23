@@ -1603,10 +1603,28 @@ Light Bluish Gray 0,68. Une seule a été marquée « à vérifier », la barre 
 
 ### Le barème de « à vérifier »
 
-L'écran de validation ne montre **que les lignes à vérifier**, de la moins sûre à la plus
-sûre ; les autres sont masquées derrière un bouton. Au premier essai réel, aucune pièce
-au-dessus de 80 % n'a eu besoin d'être corrigée : les faire défiler pour trouver les sept qui
-comptent est du travail pour rien.
+L'écran de validation montre **une ligne par LOT**, et seulement celles **à vérifier**, de
+la moins sûre à la plus sûre ; les autres sont masquées derrière un bouton.
+
+**Une ligne par lot, pas par découpe.** Une photo de dix pièces dont six identiques donnait
+six lignes à valider, chacune avec sa note : six fois le même geste pour une seule décision,
+et une quantité à saisir à la main alors qu'on venait de photographier six fois la pièce. La
+quantité EST maintenant le nombre de découpes.
+
+La note du lot est celle de sa découpe **la plus faible**, et le motif vient d'elle. Prendre
+la meilleure, ou la moyenne, cacherait exactement ce qu'on cherche : si une des six n'est pas
+la bonne pièce, c'est elle qu'il faut voir. La vignette affichée est donc la sienne ; ouvrir
+la ligne montre les autres, chacune retirable — si cinq sur six sont justes, on enlève la
+sixième sans défaire les cinq.
+
+**Le seuil est à 60 %, après un aller-retour qui a appris quelque chose.** Au premier essai,
+rien au-dessus de 80 % n'avait eu besoin d'être corrigé, et le seuil est monté de 60 à 80 par
+prudence. Au deuxième, avec des pièces entre 60 et 80 % : toutes étaient bonnes. Ce qui a
+changé, c'est la raison — à 60 %, la note de Brickognize serait trop basse pour être crue
+*seule*, mais elle ne l'est jamais : le candidat retenu doit en plus être encore à
+l'inventaire du set, dans la bonne couleur et en quantité suffisante. L'espace d'erreur n'est
+pas le catalogue BrickLink entier, ce sont les quelques dizaines de lots qui restent dans
+cette boîte-là.
 
 Une ligne est signalée quand l'une de ces cinq choses est vraie, et le motif est **écrit sur
 la ligne** — le pourcentage affiché est la note de la PIÈCE et elle seule, donc une ligne à
@@ -1614,7 +1632,7 @@ la ligne** — le pourcentage affiché est la note de la PIÈCE et elle seule, d
 
 | motif | seuil |
 |---|---|
-| la pièce est peu sûre | sous 80 % (`SURE_ITEM`, venu de l'essai réel ; c'était 60 % avant) |
+| la pièce est peu sûre | sous 60 % (`SURE_ITEM`) |
 | la couleur est peu sûre, sans être déduite | sous 45 % (`SURE_COLOR`) |
 | l'inventaire l'a repêchée loin | au-delà du rang 3 (`DEEP_RANK`) |
 | la découpe touche le bord du cadre | — |

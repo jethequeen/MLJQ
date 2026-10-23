@@ -114,7 +114,13 @@
   .cw img{ width:100%; height:100%; display:block; }
   .cw .bb{ position:absolute; border:1.5px solid #16a34a; box-sizing:border-box;
            border-radius:1px; }
-  .cw .bb.part{ border-color:#d97706; }
+  .xn{ font-size:12px; font-weight:750; color:var(--mute); flex:none; margin-left:-4px; }
+  .thumbrow{ display:flex; flex-wrap:wrap; gap:7px; padding:9px 0 2px;
+             border-top:1px solid var(--line); }
+  .thb{ position:relative; border:0; background:none; padding:0; line-height:0; }
+  .thb .x{ position:absolute; top:-5px; right:-5px; background:var(--card);
+           border:1px solid var(--line); border-radius:999px; width:16px; height:16px;
+           font-size:9px; line-height:14px; color:var(--mute); }
   .find{ display:flex; align-items:center; gap:10px; padding:9px 0;
          border-top:1px solid var(--line); }
   .find > img{ width:46px; height:46px; object-fit:contain; border-radius:7px;
@@ -1890,11 +1896,18 @@
                                // prennent en pleine résolution : Brickognize a besoin du détail.
   var SEG_MARGIN = 0.12;       // marge autour de chaque boîte, en fraction de son grand côté
   var CROP_PX = 420;           // côté long de la découpe envoyée à Brickognize
-  // Au-dessus de SURE_ITEM, la reconnaissance passe sans être signalée. 0,80 vient du
-  // PREMIER ESSAI RÉEL, pas d'une estimation : au-dessus de 80 %, aucune pièce n'a eu besoin
-  // d'être corrigée. Le seuil était à 0,60 avant, ce qui affichait en vert des pièces entre
-  // 60 et 80 % dont personne n'avait vérifié qu'elles étaient justes.
-  var SURE_ITEM = 0.80, SURE_COLOR = 0.45;
+  // Au-dessus de SURE_ITEM, la reconnaissance passe sans être signalée.
+  //
+  // 0,60, et le chemin pour y arriver vaut d'être dit. Premier essai : rien au-dessus de 80 %
+  // n'avait eu besoin d'être corrigé, donc le seuil est monté de 0,60 à 0,80 par prudence.
+  // Deuxième essai, avec des pièces entre 60 et 80 % : TOUTES étaient bonnes. On redescend.
+  //
+  // Ce n'est pas un aller-retour pour rien, c'est la raison qui a changé : à 60 % la note de
+  // Brickognize serait trop basse pour être crue SEULE, mais elle ne l'est jamais — le
+  // candidat retenu doit en plus être encore à l'inventaire du set, dans la bonne couleur et
+  // en quantité suffisante. L'espace d'erreur n'est pas le catalogue BrickLink entier, ce
+  // sont les quelques dizaines de lots qui restent dans cette boîte-là.
+  var SURE_ITEM = 0.60, SURE_COLOR = 0.45;
   var DEEP_RANK = 3;           // au-delà de ce rang, le repêchage est signalé : un choix pris
                                // au rang 17 à 0,28 pendant que le candidat brut est à 0,76 est
                                // juste assez souvent pour être gardé, et faux assez souvent
@@ -1902,14 +1915,14 @@
 
   var CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
              lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-             finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:''};
+             finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:'', bump:{}};
 
   function openCat(key, bag){
     var s = SETS.filter(function(x){ return x.key === key; })[0];
     if(!s) return;
     CAT = {key:key, number:s.number, name:s.name, bag:String(bag || ''), data:null,
            loading:true, err:null, lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null,
-           boxes:[], overlay:'', finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:''};
+           boxes:[], overlay:'', finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:'', bump:{}};
     render();
     google.script.run.withSuccessHandler(function(d){
       if(CAT.key !== key) return;
@@ -1942,7 +1955,7 @@
     if(CAT.shot && CAT.shot.bmp && CAT.shot.bmp.close) try{ CAT.shot.bmp.close(); }catch(e){}
     CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
            lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-           finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:''};
+           finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:'', bump:{}};
     render();
   }
 
@@ -1963,6 +1976,7 @@
       if(f === skip || f.drop || !f.pick) return;
       if(f.pick.lot.k === k) used += f.qty;
     });
+    used += Math.max(0, CAT.bump['k:' + k] || 0);   // les quantités ajoutées à la main
     return Math.max(0, Number(l.qty || 0) - used);
   }
 
@@ -2868,19 +2882,21 @@
   }
 
   function catAddFinds(){
-    var n = 0, pieces = 0;
-    CAT.finds.forEach(function(f){
-      if(f.drop || !f.pick || f.qty <= 0) return;
-      var l = f.pick.lot, k = l.k;
-      if(CAT.lots[k]) CAT.lots[k].qty += f.qty;
+    var groups = catGroups(), n = 0, pieces = 0, absent = 0;
+    groups.forEach(function(g){
+      if(!g.lot){ absent++; return; }
+      if(g.qty <= 0) return;
+      var l = g.lot, k = g.key;
+      if(CAT.lots[k]) CAT.lots[k].qty += g.qty;
       else CAT.lots[k] = {k:k, id:l.id, color:l.color, name:l.name, color_name:l.color_name,
-                          qty:f.qty, score:Math.round((f.pick.score || 0) * 100) / 100};
-      n++; pieces += f.qty;
+                          qty:g.qty,
+                          score:Math.round((g.weak.pick.score || 0) * 100) / 100};
+      n++; pieces += g.qty;
     });
-    var absent = CAT.finds.filter(function(f){ return !f.drop && !f.pick; }).length;
     if(!n){ toast('Rien à ajouter'); return; }
     CAT.photos++;
     CAT.finds = []; CAT.boxes = []; CAT.overlay = ''; CAT.stage = 'idle';
+    CAT.bump = {}; CAT.open = null;
     catSave(function(){
       toast(pieces + ' pièce(s) ajoutée(s) au sac ' + CAT.bag
             + (absent ? ' — ' + absent + ' non reconnue(s), à faire à la main' : ''));
@@ -3004,44 +3020,89 @@
     };
   }
 
-  function catFindHtml(f){
-    var st = findStatus(f);
-    var h = '<div class="find ' + (f.drop ? 'off' : st) + '">';
-    h += '<span class="fno">' + f.i + '</span>';
-    h += catThumb(f);
-    if(f.pick){
-      var l = f.pick.lot, pc = Math.round(f.pick.si * 100);
-      var cls = f.pick.si >= SURE_ITEM ? 'good' : (f.pick.si >= 0.4 ? 'mid' : 'bad');
-      // Le MOTIF d'abord quand il y en a un : c'est ce qu'on est venu lire. Sinon, la note
-      // utile (couleur déduite, choisie à la main) — et rien du tout si tout va de soi.
-      var why = findWhy(f), note = why.slice();
-      if(!why.length){
-        if(f.pick.deduced) note.push('couleur déduite');
-        if(f.pick.manual) note.push('choisie à la main');
+  /** Les découpes retenues, REGROUPÉES PAR LOT.
+   *
+   *  Une photo de dix pièces dont six identiques donnait six lignes à valider, chacune avec
+   *  sa note : six fois le même geste pour une seule décision, et une quantité à saisir à la
+   *  main alors qu'on vient de photographier six fois la pièce. Un lot, une ligne, et la
+   *  quantité EST le nombre de découpes.
+   *
+   *  La note du lot est celle de sa découpe la plus FAIBLE, et le motif vient d'elle.
+   *  Prendre la meilleure, ou la moyenne, cacherait exactement ce qu'on cherche : si une des
+   *  six n'est pas la bonne pièce, c'est elle qu'il faut voir, pas la moyenne des six.
+   */
+  function catGroups(){
+    var by = {}, out = [];
+    CAT.finds.forEach(function(f){
+      if(f.drop) return;
+      if(!f.pick){ out.push({gid:'f:' + f.i, solo:f, members:[f], lot:null}); return; }
+      var k = f.pick.lot.k;
+      if(!by[k]){ by[k] = {gid:'k:' + k, key:k, lot:f.pick.lot, members:[]}; out.push(by[k]); }
+      by[k].members.push(f);
+    });
+    out.forEach(function(g){
+      g.weak = g.members.slice().sort(function(a, b){
+        return findRank(a) - findRank(b); })[0];
+      g.why = findWhy(g.weak);
+      g.status = g.solo ? 'absent' : (g.why.length ? 'doubt' : 'ok');
+      g.bump = Math.max(0, CAT.bump[g.gid] || 0);
+      g.qty = g.members.length + g.bump;
+    });
+    return out;
+  }
+
+  function catGroupHtml(g){
+    var h = '<div class="find ' + g.status + '">';
+    // La vignette montrée est celle de la découpe la plus faible : c'est celle qui mérite
+    // l'œil, et elle porte la boîte de Brickognize. Les autres s'ouvrent avec la ligne.
+    h += catThumb(g.weak);
+    if(g.members.length > 1){
+      h += '<span class="xn">×' + g.members.length + '</span>';
+    }
+    if(g.lot){
+      var l = g.lot, p = g.weak.pick, pc = Math.round(p.si * 100);
+      var cls = p.si >= SURE_ITEM ? 'good' : (p.si >= 0.4 ? 'mid' : 'bad');
+      var note = g.why.slice();
+      if(!g.why.length){
+        if(p.deduced) note.push('couleur déduite');
+        if(p.manual) note.push('choisie à la main');
       }
-      h += '<button class="ft" data-cand="' + f.i + '">' + esc(l.name || l.id)
+      if(g.bump) note.push('+' + g.bump + ' à la main');
+      h += '<button class="ft" data-gcand="' + esc(g.gid) + '">' + esc(l.name || l.id)
          + '<span>' + esc(l.color_name || ('couleur ' + l.color)) + ' · ' + esc(l.id)
          + (note.length ? ' · ' + esc(note.join(' · ')) : '') + '</span></button>';
       h += '<span class="sc ' + cls + '">' + pc + '%</span>';
-      h += '<span class="qty"><button data-less="' + f.i + '">−</button><b>' + f.qty
-         + '</b><button data-more="' + f.i + '">+</button></span>';
+      h += '<span class="qty"><button data-gless="' + esc(g.gid) + '">−</button><b>' + g.qty
+         + '</b><button data-gmore="' + esc(g.gid) + '">+</button></span>';
     } else {
-      h += '<button class="ft" data-cand="' + f.i + '">Non reconnue'
-         + '<span>' + esc(f.err || 'aucun candidat n’est encore à l’inventaire')
+      h += '<button class="ft" data-gcand="' + esc(g.gid) + '">Non reconnue'
+         + '<span>' + esc(g.solo.err || 'aucun candidat n’est encore à l’inventaire')
          + ' — choisis-la à la main</span></button>';
     }
-    h += '<button class="qty" data-drop="' + f.i + '" style="border:0;background:none;'
-       + 'color:var(--mute);font-size:17px;padding:0 2px">'
-       + (f.drop ? '↺' : '✕') + '</button>';
+    h += '<button class="qty" data-gdrop="' + esc(g.gid) + '" style="border:0;background:none;'
+       + 'color:var(--mute);font-size:17px;padding:0 2px">✕</button>';
     h += '</div>';
-    if(CAT.open === f.i){
-      (f.pairs || []).forEach(function(p, i){
-        var on = (f.pick === p);
-        h += '<button class="cand' + (on ? ' on' : '') + '" data-pick="' + f.i + ':' + i + '">'
+
+    if(CAT.open === g.gid){
+      // Les découpes du lot, une par une : si cinq sur six sont la bonne pièce, on enlève la
+      // sixième sans défaire les cinq autres.
+      if(g.members.length > 1){
+        h += '<div class="thumbrow">';
+        g.members.forEach(function(f){
+          h += '<button class="thb" data-thumb="' + f.i + '" title="Retirer cette découpe">'
+             + catThumb(f) + '<span class="x">✕</span></button>';
+        });
+        h += '</div>';
+      }
+      var pairs = (g.weak.pairs || []);
+      pairs.forEach(function(p, i){
+        var on = (g.weak.pick === p);
+        h += '<button class="cand' + (on ? ' on' : '') + '" data-gpick="' + esc(g.gid)
+           + ':' + i + '">'
            + '<img src="' + partImg({type:p.lot.type, color_id:p.lot.color, id:p.lot.id})
            + '" onerror="this.style.visibility=&quot;hidden&quot;">'
            + '<span class="ct">' + esc(p.lot.name || p.lot.id)
-           + '<span>' + esc(p.lot.color_name || '') + ' · reste ' + catAvail(p.lot.k, f)
+           + '<span>' + esc(p.lot.color_name || '') + ' · reste ' + catAvail(p.lot.k, g.weak)
            + (p.deduced ? ' · seule couleur au set' : '') + '</span></span>'
            + '<span class="sc">' + Math.round(p.si * 100) + '/'
            + Math.round(p.cs * 100) + '</span></button>';
@@ -3051,16 +3112,16 @@
       if(CAT.q.trim()){
         var q = fold(CAT.q.trim()), inv = catInv(), hits = [];
         for(var k in inv){
-          var l = inv[k];
-          if(catAvail(k, f) <= 0) continue;
-          if(fold(l.name + ' ' + l.id + ' ' + l.color_name).indexOf(q) >= 0) hits.push(l);
+          if(catAvail(k, g.weak) <= 0) continue;
+          var li = inv[k];
+          if(fold(li.name + ' ' + li.id + ' ' + li.color_name).indexOf(q) >= 0) hits.push(li);
         }
-        hits.slice(0, 12).forEach(function(l){
-          h += '<button class="cand" data-manual="' + f.i + ':' + esc(l.k) + '">'
-             + '<img src="' + partImg({type:l.type, color_id:l.color, id:l.id})
+        hits.slice(0, 12).forEach(function(li){
+          h += '<button class="cand" data-gman="' + esc(g.gid) + ':' + esc(li.k) + '">'
+             + '<img src="' + partImg({type:li.type, color_id:li.color, id:li.id})
              + '" onerror="this.style.visibility=&quot;hidden&quot;">'
-             + '<span class="ct">' + esc(l.name || l.id) + '<span>'
-             + esc(l.color_name || '') + ' · reste ' + catAvail(l.k, f)
+             + '<span class="ct">' + esc(li.name || li.id) + '<span>'
+             + esc(li.color_name || '') + ' · reste ' + catAvail(li.k, g.weak)
              + '</span></span></button>';
         });
         if(!hits.length) h += '<div class="hint">Rien de tel dans ce qui reste à cataloguer.</div>';
@@ -3140,36 +3201,35 @@
          + '<button class="act solid" data-cat-go="1">Identifier les ' + CAT.boxes.length
          + '</button></div>';
     } else if(CAT.stage === 'review'){
-      var keep = CAT.finds.filter(function(f){ return !f.drop && f.pick; });
-      var npc = keep.reduce(function(a, f){ return a + f.qty; }, 0);
-      var todo = CAT.finds.filter(function(f){
-        return !f.drop && findStatus(f) !== 'ok'; });
-      var sure = CAT.finds.length - todo.length;
+      var groups = catGroups();
+      var npc = groups.reduce(function(a, g){ return a + (g.lot ? g.qty : 0); }, 0);
+      var todo = groups.filter(function(g){ return g.status !== 'ok'; });
+      var sure = groups.length - todo.length;
 
       // On ne montre que ce qui demande l'œil, de la moins sûre à la plus sûre. Les lignes
       // sûres sont justes — au-dessus de 80 % aucune n'a eu besoin d'être corrigée au premier
       // essai réel — donc les faire défiler pour trouver les sept qui comptent est du travail
       // pour rien. Elles restent atteignables d'un bouton, parce que « masqué » ne doit jamais
       // vouloir dire « inaccessible » sur des lignes qu'on s'apprête à écrire dans un .bsx.
-      var shown = CAT.all ? CAT.finds.slice() : todo.slice();
-      shown.sort(function(a, b){ return findRank(a) - findRank(b); });
+      var shown = CAT.all ? groups.slice() : todo.slice();
+      shown.sort(function(a, b){ return findRank(a.weak) - findRank(b.weak); });
 
-      h += '<div class="hint"><b>' + npc + ' pièce(s) reconnue(s)</b>'
+      h += '<div class="hint"><b>' + npc + ' pièce(s) en ' + groups.length + ' lot(s)</b>'
          + (todo.length ? ' · <b>' + todo.length + ' à vérifier</b>' : ' · rien à vérifier')
-         + (sure ? ' · ' + sure + ' sûre(s)' + (CAT.all ? '' : ', masquée(s)') : '')
+         + (sure ? ' · ' + sure + ' sûr(s)' + (CAT.all ? '' : ', masqué(s)') : '')
          + '.<br>Une ligne est à vérifier quand la pièce est sous ' + Math.round(SURE_ITEM * 100)
          + ' %, quand la couleur est sous ' + Math.round(SURE_COLOR * 100) + ' % sans être '
          + 'déduite, quand l’inventaire l’a repêchée au-delà du rang ' + DEEP_RANK + ', ou '
          + 'quand la découpe touche le bord. Le motif est écrit sur chacune.</div>';
       if(sure){
         h += '<div class="frow"><button class="fchip' + (CAT.all ? ' on' : '') + '" '
-           + 'data-cat-all="1">' + (CAT.all ? 'Masquer les sûres' : 'Montrer les ' + sure
-           + ' sûre(s)') + '</button></div>';
+           + 'data-cat-all="1">' + (CAT.all ? 'Masquer les sûrs' : 'Montrer les ' + sure
+           + ' lot(s) sûr(s)') + '</button></div>';
       }
       if(!shown.length){
         h += '<div class="done">Tout est net — rien à vérifier sur cette photo.</div>';
       }
-      shown.forEach(function(f){ h += catFindHtml(f); });
+      shown.forEach(function(g){ h += catGroupHtml(g); });
       h += '<div class="acts"><button class="act" data-cat-cancel="1">Annuler la photo</button>'
          + '<button class="act solid' + (npc ? '' : ' off') + '" data-cat-add="1">'
          + 'Ajouter au sac</button></div>';
@@ -3317,48 +3377,75 @@
     app.querySelectorAll('[data-bag]').forEach(function(b){
       b.addEventListener('click', function(){
         CAT.bag = b.getAttribute('data-bag'); render(); }); });
-    app.querySelectorAll('[data-cand]').forEach(function(b){
+    function group(gid){
+      var gs = catGroups();
+      for(var i = 0; i < gs.length; i++) if(gs[i].gid === gid) return gs[i];
+      return null;
+    }
+    app.querySelectorAll('[data-gcand]').forEach(function(b){
       b.addEventListener('click', function(){
-        var i = Number(b.getAttribute('data-cand'));
-        CAT.open = (CAT.open === i) ? null : i;
+        var gid = b.getAttribute('data-gcand');
+        CAT.open = (CAT.open === gid) ? null : gid;
         CAT.q = '';
         render();
       }); });
-    app.querySelectorAll('[data-pick]').forEach(function(b){
+    app.querySelectorAll('[data-gpick]').forEach(function(b){
       b.addEventListener('click', function(){
-        var p = b.getAttribute('data-pick').split(':'), ff = find(p[0]);
-        if(!ff) return;
-        ff.pick = ff.pairs[Number(p[1])];
-        ff.qty = Math.min(ff.qty, Math.max(1, catAvail(ff.pick.lot.k, ff)));
+        var v = b.getAttribute('data-gpick'), at = v.lastIndexOf(':');
+        var g = group(v.slice(0, at)), idx = Number(v.slice(at + 1));
+        if(!g) return;
+        // Le choix vaut pour TOUTES les découpes du lot : elles disaient la même pièce, elles
+        // se corrigent ensemble. Celle qu'on voulait isoler, on l'enlève par sa vignette.
+        var p = g.weak.pairs[idx];
+        if(!p) return;
+        g.members.forEach(function(f){
+          var own = (f.pairs || []).filter(function(q){
+            return q.lot.k === p.lot.k; })[0];
+          f.pick = own || p;
+        });
         CAT.open = null; render();
       }); });
-    app.querySelectorAll('[data-manual]').forEach(function(b){
+    app.querySelectorAll('[data-gman]').forEach(function(b){
       b.addEventListener('click', function(){
-        var v = b.getAttribute('data-manual'), i = v.slice(0, v.indexOf(':'));
-        var k = v.slice(v.indexOf(':') + 1), ff = find(i), l = catInv()[k];
-        if(!ff || !l) return;
+        var v = b.getAttribute('data-gman'), at = v.indexOf(':');
+        var g = group(v.slice(0, at)), l = catInv()[v.slice(at + 1)];
+        if(!g || !l) return;
         // Choisie à la main : la note n'a plus de sens, et la donner à 100 % laisserait
         // croire que la machine avait trouvé.
-        ff.pairs = [{lot:l, si:1, cs:1, manual:true, score:1}].concat(ff.pairs || []);
-        ff.pick = ff.pairs[0];
-        ff.qty = 1;
+        g.members.forEach(function(f){
+          f.pairs = [{lot:l, si:1, cs:1, manual:true, rank:0, crank:0, score:1}]
+                      .concat(f.pairs || []);
+          f.pick = f.pairs[0];
+        });
         CAT.open = null; CAT.q = ''; render();
       }); });
-    app.querySelectorAll('[data-more]').forEach(function(b){
+    app.querySelectorAll('[data-gmore]').forEach(function(b){
       b.addEventListener('click', function(){
-        var ff = find(b.getAttribute('data-more'));
-        if(ff && ff.pick && catAvail(ff.pick.lot.k, ff) > ff.qty){ ff.qty++; render(); }
-        else toast('L’inventaire n’en tient pas plus');
+        var gid = b.getAttribute('data-gmore'), g = group(gid);
+        if(!g || !g.lot) return;
+        if(catAvail(g.key) <= 0) return toast('L’inventaire n’en tient pas plus');
+        CAT.bump[gid] = (CAT.bump[gid] || 0) + 1;
+        render();
       }); });
-    app.querySelectorAll('[data-less]').forEach(function(b){
+    app.querySelectorAll('[data-gless]').forEach(function(b){
       b.addEventListener('click', function(){
-        var ff = find(b.getAttribute('data-less'));
-        if(ff && ff.qty > 1){ ff.qty--; render(); }
+        var gid = b.getAttribute('data-gless');
+        if((CAT.bump[gid] || 0) > 0){ CAT.bump[gid]--; render(); }
+        else toast('Enlève une découpe pour descendre plus bas');
       }); });
-    app.querySelectorAll('[data-drop]').forEach(function(b){
+    app.querySelectorAll('[data-gdrop]').forEach(function(b){
       b.addEventListener('click', function(){
-        var ff = find(b.getAttribute('data-drop'));
-        if(ff){ ff.drop = !ff.drop; render(); }
+        var gid = b.getAttribute('data-gdrop'), g = group(gid);
+        if(!g) return;
+        g.members.forEach(function(f){ f.drop = true; });
+        delete CAT.bump[gid];
+        if(CAT.open === gid) CAT.open = null;
+        render();
+      }); });
+    app.querySelectorAll('[data-thumb]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var ff = find(b.getAttribute('data-thumb'));
+        if(ff){ ff.drop = true; render(); }
       }); });
     app.querySelectorAll('[data-lmore]').forEach(function(b){
       b.addEventListener('click', function(){
