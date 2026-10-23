@@ -308,6 +308,20 @@
   </div>
 </div>
 
+<!-- La confirmation de l'app, en remplacement de celle du navigateur : celle-ci surgit au
+     milieu de l'écran, n'a ni les couleurs ni les mots du reste, et sur iOS elle porte le nom
+     du domaine Apps Script. Même rôle, même place que les deux feuilles d'à côté. -->
+<div class="modal hidden" id="askmodal">
+  <div class="sheet">
+    <h2 id="ask_t">Confirmer</h2>
+    <div class="sub" id="ask_m"></div>
+    <div class="btns" style="margin-top:14px">
+      <button class="cancel" id="ask_no">Non</button>
+      <button class="go" id="ask_yes">Oui</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal hidden" id="phasemodal">
   <div class="sheet">
     <h2>Changer la phase</h2>
@@ -336,6 +350,23 @@
   // and nine bag chips per set pushed everything else off screen. Tap a card to open it.
   var OPEN = {};
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  // ── La confirmation de l'app ────────────────────────────────────────────────
+  // `confirm()` du navigateur est banni : il surgit au milieu de l'écran, il n'a ni les
+  // couleurs ni les mots du reste, et sur iOS il s'annonce au nom du domaine Apps Script.
+  // `message` peut porter des <br> ; tout ce qui vient d'ailleurs passe par esc().
+  var ASK = null;
+  function askConfirm(title, message, yesLabel, onYes){
+    ASK = onYes;
+    document.getElementById('ask_t').textContent = title;
+    document.getElementById('ask_m').innerHTML = message;
+    document.getElementById('ask_yes').textContent = yesLabel || 'Oui';
+    document.getElementById('askmodal').classList.remove('hidden');
+  }
+  function askClose(){
+    ASK = null;
+    document.getElementById('askmodal').classList.add('hidden');
+  }
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2600); }
   function imgUrl(num){ if(!num) return ''; var sid=(String(num).indexOf('-')>=0)?num:(num+'-1'); return 'https://images.brickset.com/sets/small/'+sid+'.jpg'; }
 
@@ -659,16 +690,16 @@
       var name = cb.getAttribute('data-batch');
       var full = !!cb.getAttribute('data-full');
       var q = String.fromCharCode(39);
-      var br = String.fromCharCode(10, 10);
-      var msg = full
-        ? 'Fermer l' + q + 'envoi ' + name + ' ?' + br
-          + 'Il est complet. Plus aucun set ne pourra y être ajouté, et le prochain '
+      var msg = (full
+        ? 'Il est complet. Plus aucun set ne pourra y être ajouté, et le prochain '
           + 'classement visera un envoi neuf.'
-        : 'Fermer l' + q + 'envoi ' + name + ' ?' + br
-          + '⚠ Il n' + q + 'est PAS complet. Le fermer veut dire que tu renonces à le '
-          + 'remplir.';
-      msg += br + 'Réversible : le même bouton le rouvrira.';
-      if(!confirm(msg)) return;
+        : '<b>⚠ Il n' + q + 'est PAS complet.</b> Le fermer veut dire que tu renonces à le '
+          + 'remplir.')
+        + '<br><br>Réversible : le même bouton le rouvrira.';
+      askConfirm('Fermer l' + q + 'envoi ' + esc(name) + ' ?', msg, 'Oui, fermer',
+                 function(){ doCloseBatch(cb, name); });
+    });
+    function doCloseBatch(cb, name){
       cb.disabled = true; cb.textContent = '...';
       google.script.run.withSuccessHandler(function(r){
         cb.disabled = false;
@@ -685,7 +716,7 @@
         cb.textContent = 'Fermer l' + String.fromCharCode(39) + 'envoi ' + name;
         toast('Échec : ' + e.message);
       }).closeBatch(name, true);
-    });
+    }
     renderBuyList();
   }
 
@@ -862,7 +893,11 @@
   function queueJob(a){
     var j = JOBS.filter(function(x){ return x.a===a; })[0];
     if(!j) return;
-    if(!confirm(j.q+'\n(le PC le fera dès qu\'il tourne)')) return;
+    askConfirm(esc(j.t) + ' ?', esc(j.q) + '<br><br>Le PC le fera dès qu\'il tourne.',
+               'Oui, demander', function(){ doQueueJob(j, a); });
+  }
+
+  function doQueueJob(j, a){
     JOBQ[a] = {status:'pending', result:''};
     renderFin();
     google.script.run.withSuccessHandler(function(r){
@@ -1801,13 +1836,19 @@
   function queueAction(key, action){
     var s = SETS.filter(function(x){return x.key===key;})[0]; if(!s) return;
     var label = action==='restants' ? 'Appliquer restant' : 'Construire CFB';
-    var q = action==='build_cfb'
-      ? 'Construire le fichier CFB, l\'envoyer par courriel, puis TERMINER le set ?\n\n'
-        + '• les copies sortent de l\'inventaire\n'
-        + '• le dossier part à la corbeille du PC (récupérable)\n\n'
+    var msg = action==='build_cfb'
+      ? '<b>Le set sera TERMINÉ :</b><br>• les copies sortent de l\'inventaire<br>'
+        + '• le dossier part à la corbeille du PC (récupérable)<br><br>'
         + 'Rien n\'est touché si le courriel ne part pas.'
-      : 'Calculer les restants pour ce set ?';
-    if(!confirm(q+' Le PC le fera dès qu\'il tourne.')) return;
+      : 'Le PC calculera les restants de ce set.';
+    askConfirm(action==='build_cfb'
+                 ? 'Construire le CFB et l\'envoyer ?' : 'Calculer les restants ?',
+               msg + '<br><br>Le PC le fera dès qu\'il tourne.',
+               action==='build_cfb' ? 'Oui, construire' : 'Oui, calculer',
+               function(){ doQueueAction(s, key, action, label); });
+  }
+
+  function doQueueAction(s, key, action, label){
     s.cmd = {action:action, status:'pending', result:'en attente du PC'};
     render();
     google.script.run.withSuccessHandler(function(r){
@@ -3468,6 +3509,16 @@
     }).withFailureHandler(function(e){
       go.disabled=false; go.textContent='Enregistrer'; toast('Échec : '+e.message);
     }).logPurchase(p);
+  });
+
+  document.getElementById('ask_no').addEventListener('click', askClose);
+  document.getElementById('ask_yes').addEventListener('click', function(){
+    var go = ASK;                       // on referme AVANT d'agir : l'action peut re-rendre
+    askClose();                         // la page, et la feuille resterait par-dessus
+    if(go) go();
+  });
+  document.getElementById('askmodal').addEventListener('click', function(ev){
+    if(ev.target.id === 'askmodal') askClose();      // toucher à côté = annuler
   });
 
   document.getElementById('phase_cancel').addEventListener('click', function(){ document.getElementById('phasemodal').classList.add('hidden'); });
