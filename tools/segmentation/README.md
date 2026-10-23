@@ -43,7 +43,7 @@ ces deux-là, tout va bien. Si tu en vois d'autres, quelque chose a bougé.
 ## Les photos
 
 Six photos réelles du set **42226 — BMW M4 GT3 EVO**, prises par Jérémie dans ses conditions
-de travail. `1-dense` est son mode préféré : une seule photo, tout le sachet étalé. Les cinq
+de travail. `1-dense` est son mode préféré : une seule photo, tout le sac étalé. Les cinq
 autres sont des sous-groupes des mêmes pièces, en gros plan.
 
 `photos/verite.json` porte le nombre de pièces **réellement posées**, compté à l'œil. C'est la

@@ -1861,7 +1861,7 @@
         CAT.cmd = d.cmd; CAT.cmdId = d.cmd.id || ''; catPoll(0);
       }
       // Une liste déjà ouverte reprend là où elle s'était arrêtée, et c'est SON sac qui
-      // compte : le téléphone reposé au milieu d'un sachet ne doit pas en recommencer un
+      // compte : le téléphone reposé au milieu d'un sac ne doit pas en recommencer un
       // autre sans le dire.
       if(d.session && (d.session.lots || []).length){
         (d.session.lots || []).forEach(function(l){ CAT.lots[l.k] = l; });
@@ -2921,7 +2921,7 @@
        + '<div><i>Reste au set</i><b>' + ((d.inv_qty || 0) - catPieces()) + '</b></div>'
        + '</div>';
 
-    // Le choix du sac : la suite du sachet en cours, ou le suivant. Rien dans les fichiers
+    // Le choix du sac : la suite du sac en cours, ou le suivant. Rien dans les fichiers
     // ne dit lequel — ça dépend d'un fait physique, donc c'est à nous de trancher.
     if(!catPieces() && CAT.stage === 'idle'){
       h += '<div class="frow">';

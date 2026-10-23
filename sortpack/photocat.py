@@ -35,7 +35,7 @@ from . import bsx
 from . import plan as plan_mod
 
 
-# Un nom de sac : "3", ou "3 - 1" pour la deuxième liste du même sachet. C'est la forme que
+# Un nom de sac : "3", ou "3 - 1" pour la deuxième liste du même sac. C'est la forme que
 # `plan.bag_sort_key` sait ordonner ; tout le reste sortirait de l'ordre des sacs.
 _LABEL_RE = re.compile(r"^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$")
 
@@ -66,10 +66,10 @@ def bag_labels(set_folder):
 
 
 def next_bags(labels):
-    """Les deux noms à proposer : la suite du sachet en cours, et le sachet suivant.
+    """Les deux noms à proposer : la suite du sac en cours, et le sac suivant.
 
     Avec 1, 1-1, 2, 2-1, 3 en place, ce sont « 3 - 1 » et « 4 » — on ne peut pas deviner
-    lequel des deux, parce que ça dépend d'un fait physique (le sachet 3 est-il vide ?) que
+    lequel des deux, parce que ça dépend d'un fait physique (le sac 3 est-il vide ?) que
     les fichiers ne portent pas. Le téléphone montre donc les deux.
     """
     biggest = sub = 0

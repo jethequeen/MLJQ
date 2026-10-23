@@ -1581,7 +1581,7 @@ Tri → un envoi → une carte de set en cataloguage → « Ajouter un sac »
    → un appel Brickognize par découpe
    → le candidat qui est ENCORE à l'inventaire du set
    → on corrige ce qui est douteux, « Ajouter au sac »
-   … on recommence jusqu'à ce que le sachet soit vide …
+   … on recommence jusqu'à ce que le sac soit vide …
    → « Fermer la liste » → le PC écrit le .bsx et décrémente l'inventaire
 ```
 
@@ -1681,7 +1681,7 @@ cas il faut l'œil, pas une décision automatique.
 ### Pourquoi tout se passe dans le téléphone, sauf l'écriture
 
 Drive met « secondes à minutes » à propager une écriture (voir *Un seul poste à la fois*).
-Un aller-retour PC par photo, avec une vingtaine de photos par sachet, ce serait vingt
+Un aller-retour PC par photo, avec une vingtaine de photos par sac, ce serait vingt
 minutes d'attente par sac. La boucle ne quitte donc jamais le téléphone :
 
 - la **photo** passe par `<input type="file" capture>`, pas par `getUserMedia` : l'iframe
@@ -1704,7 +1704,7 @@ minutes d'attente par sac. La boucle ne quitte donc jamais le téléphone :
 Le `localStorage` du navigateur **ne convient pas** : la page vit sur le sous-domaine
 `n-xxxx.googleusercontent.com` d'Apps Script, qui tourne, et une heure de saisie partirait
 avec lui. La session va donc sur Drive après chaque photo, et le téléphone reposé au milieu
-d'un sachet reprend là où il en était.
+d'un sac reprend là où il en était.
 
 Un seul fichier pour tous les sets, et non un par set : la liste du téléphone le lit à
 chaque rafraîchissement pour afficher *« Reprendre le sac 4 (37 pièces) »*, et un fichier par
@@ -1723,8 +1723,8 @@ présence EST le garde-fou (`CATALOGUE_DONE_FRACTION`, 5 %). Il n'apparaît pas 
 que les sachets soient séparés : l'ordre physique n'est pas négociable.
 
 Le nom se lit dans les fichiers. Avec `1, 1-1, 2, 2-1, 3` en place, il propose **`3 - 1`**
-(la suite du sachet en cours) **ou `4`** (le sachet suivant) — on ne peut pas deviner lequel,
-parce que ça dépend d'un fait physique que les fichiers ne portent pas : le sachet 3 est-il
+(la suite du sac en cours) **ou `4`** (le sac suivant) — on ne peut pas deviner lequel,
+parce que ça dépend d'un fait physique que les fichiers ne portent pas : le sac 3 est-il
 vide ? Les deux sont offerts, et un sac déjà existant reste choisissable (les pièces s'y
 ajoutent).
 
