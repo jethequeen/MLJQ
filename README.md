@@ -1614,9 +1614,9 @@ la ligne** — le pourcentage affiché est la note de la PIÈCE et elle seule, d
 
 | motif | seuil |
 |---|---|
-| la pièce est peu sûre | sous 80 % (, venu de l'essai réel ; c'était 60 % avant) |
-| la couleur est peu sûre, sans être déduite | sous 45 % () |
-| l'inventaire l'a repêchée loin | au-delà du rang 3 () |
+| la pièce est peu sûre | sous 80 % (`SURE_ITEM`, venu de l'essai réel ; c'était 60 % avant) |
+| la couleur est peu sûre, sans être déduite | sous 45 % (`SURE_COLOR`) |
+| l'inventaire l'a repêchée loin | au-delà du rang 3 (`DEEP_RANK`) |
 | la découpe touche le bord du cadre | — |
 | aucun candidat n'est au set | — |
 
