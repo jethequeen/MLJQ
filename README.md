@@ -1604,62 +1604,79 @@ Light Bluish Gray 0,68. Une seule a été marquée « à vérifier », la barre 
 Les ids de Brickognize sont ceux de **BrickLink** (`3001`, couleur `5` = Red), donc rien à
 convertir : c'est déjà ce que `<ItemID>` et `<ColorID>` attendent dans un `.bsx`.
 
-### Le découpage — mesuré, et en cours de remplacement
+### Le découpage, réglé sur six vraies photos
 
-**Ce que la page contient aujourd'hui est un premier jet, et il ne tient pas sur de vraies
-photos.** Mesuré sur les six photos de l'atelier, contre la vérité terrain :
+Il tourne **dans la page**, en canvas, sans dépendance. Réglé sur six photos de l'atelier
+(set 42226), dont une photo dense de 47 pièces qui est le mode de travail préféré. Mesure :
+**45 pièces trouvées sur 47, aucune fausse**, puis 36 reconnues au rang 1, 8 repêchées par
+l'inventaire, 1 sans correspondance.
 
-| photo | trouvées | réelles |
-|---|---|---|
-| dense | 3 | 47 |
-| gros plan 1 | 2 | 12 |
-| gros plan 2 | 3 | 7 |
-| gros plan 3 | 2 | 11 |
-| gros plan 4 | 9 | 10 |
-| gros plan 5 | 4 | 10 |
+Trois choix portent ce résultat, et chacun vient d'un échec mesuré :
 
-La cause est nette : il estime **un seul** fond pour toute l'image, pris sur ses bords. La
-table de l'atelier est grise, l'éclairage la traverse en biais et une ombre portée mange la
-moitié du cadre — un fond unique y est faux partout ailleurs. Ce qui suit décrit donc une
-approche qui marche sur une photo synthétique et pas dans la vraie vie ; elle est remplacée
-par un fond **local** (grille médiane en deux passes), des seuils de luminance asymétriques
-(une ombre ne va que vers le bas) et une séparation des pièces collées par dynamique de la
-carte de distance. Le contrat d'interface est déjà en place — `segBoxes(rgba, w, h)` rendant
-des boîtes en pixels de travail — pour que l'échange ne touche rien d'autre.
+- **Le fond est LOCAL** — médiane par cellule de 55 px, en deux passes, la seconde
+  recalculée en excluant ce que la première a jugé « pièce ». Un fond unique pour toute
+  l'image (pris sur ses bords) donnait **3 boîtes sur 47** : la table est grise, l'éclairage
+  la traverse en biais et une ombre portée mange la moitié du cadre. Une cellule noyée par
+  une grosse pièce est déclarée vide et reprend ses voisines, sinon la pièce devient son
+  propre fond et disparaît.
+- **Luminance et teinte séparément**, toutes deux mesurées contre le fond local. C'est ce
+  qui distingue les trois cas qui se ressemblent : une ombre baisse la luminance sans
+  toucher la teinte, une pièce noire écroule la luminance, une pièce bleue déplace la
+  teinte. Un seul canal les mélange. Et la teinte se mesure CONTRE LE FOND, jamais en
+  absolu : un seuil de saturation absolu mettait 21,6 % de l'image en « couleur », le gris
+  de la table sous lumière chaude étant lui-même teinté.
+- **Les seuils de luminance sont ASYMÉTRIQUES** (+14 % / −34 %), parce qu'une ombre ne va
+  que vers le bas et que rien n'éclaircit le fond. Symétrique à 34 %, la plaque Light
+  Bluish Gray — qui ne dévie que de +25 % — était invisible.
 
-### Le premier jet : la distance au fond, et pourquoi il n'y a pas d'Otsu dedans
+Deux pièces qui se touchent se séparent par la **dynamique** de la carte de distance : de
+combien un sommet domine le col qui le relie à son voisin, relativement à l'épaisseur de la
+pièce. En pixels absolus, le même algorithme coupait une roue en gros plan et laissait
+collées deux plaques vues de loin. Une érosion à plat, qui juge sur la taille, découpait les
+gros plans en 25 morceaux pour 7 pièces.
 
-Le découpage tourne **dans la page**, en canvas, sans dépendance : OpenCV.js pèse huit
-mégaoctets pour ce que trente lignes font sur des pièces bien séparées.
+**Sur-découper est le défaut bon marché, fusionner est le défaut cher.** Un fragment ne
+trouve rien et se signale tout seul. Deux plaques collées, elles, se font reconnaître comme
+« Plate 2 x 14 » avec une note de 0,84 — ni le score ni l'inventaire ne peuvent le voir.
+C'est pour ça que la validation du découpage **porte la justesse** et n'est pas un confort,
+et que le réglage penche vers la coupe.
 
-On ne seuille pas le gris — un fond blanc avec des pièces blanches ET noires casse n'importe
-quel seuil de luminosité. On mesure la **distance à la couleur du fond**, prise sur les bords
-de l'image où il n'y a que lui.
+### Le réducteur fait partie de l'algorithme
 
-Le seuil, lui, ne se décide **pas par Otsu**, et ça s'est payé une première version :
-Otsu suppose DEUX classes, or il y en a trois — le fond, les pièces claires, les pièces
-foncées — et il tranche alors *entre les deux familles de pièces* plutôt qu'entre le fond et
-elles. Sur la photo d'essai, la barre blanche et le bush gris clair disparaissaient tous les
-deux pendant que le noir, le bleu et le rouge sortaient parfaitement. On mesure donc le
-**bruit du fond** (le 99e centile de la distance, aux bords) et tout ce qui en sort
-franchement est une pièce.
+Une leçon qui a coûté une demi-journée de fausses pistes : **la façon de réduire la photo à
+1100 px change le résultat de 10 %.** Les mêmes photos, le même découpage, réduits par deux
+filtres différents donnent 104 boîtes ou 94.
 
-Reste le cas qu'aucun seuil de couleur ne sauve : une pièce gris clair sur un fond gris
-clair. Elle a pourtant un **contour net**, et le fond n'en a pas — donc l'énergie de gradient
-entre dans le masque. Comme on ne cherche que des BOÎTES, le contour suffit : la composante
-est l'anneau, et sa boîte englobante est celle de la pièce.
+Donc on ne délègue pas la réduction à `drawImage`, dont le filtre n'est pas spécifié et
+change d'un navigateur à l'autre : la page la calcule elle-même, en moyenne de zone, les
+pixels de bord comptant **au prorata** de leur recouvrement. Leur donner une part entière
+décale l'image d'un demi-pixel, et ça se paie en pièces perdues. La photo est lue par
+bandes, à sa résolution native : douze millions de pixels d'un coup feraient cinquante
+mégaoctets d'ImageData.
 
-Deux détails qui comptent :
+Et **l'orientation EXIF compte autant** : elle est la raison d'un écart de 104 contre 96
+qu'on a d'abord cru venir du portage. `createImageBitmap(file, {imageOrientation:
+'from-image'})` l'applique — sans quoi chaque découpe partirait couchée chez Brickognize.
 
-- **fermeture avant ouverture.** La fermeture scelle les trous d'un contour fin, que
-  l'ouverture seule aurait effacé ; l'ouverture ensuite fait partir le grain du fond.
-- **on fusionne ce qui se frôle**, pas seulement ce qui se chevauche. Une pièce à deux
-  teintes — un imprimé, un pneu sur sa jante, un axe à bout foncé — se casse en deux
-  composantes séparées de quelques pixels, et l'envoyer en deux morceaux donnerait deux
-  mauvaises réponses au lieu d'une bonne.
+Vérification du portage, à pixels d'entrée égaux : **13 / 9 / 45 / 14 / 11 / 12 boîtes,
+identique à la version Python sur les six photos**, et la chaîne complète (réduction incluse)
+retrouve 45 sur la dense. Compter ~0,2 s de réduction et ~0,6 s de découpage sur un portable,
+donc environ deux secondes sur un téléphone.
 
-**L'image annotée est le garde-fou.** Deux pièces qui se touchent se retrouvent dans une
-seule boîte, et aucun code ne peut le deviner — mais ça se voit, et on reprend la photo.
+### Les deux pièces que rien ne rattrape, et le doigt
+
+Il reste 2 pièces sur 47 que le découpage ne voit pas : dans cette photo, elles sont à la
+même luminance que la table sous l'ombre. Aucun seuil ne les récupère — en abaissant le
+seuil clair, le compte BAISSE (44, puis 43), parce qu'on ramasse l'ombre elle-même.
+
+Plutôt que de dégrader le réglage pour deux pièces, **le doigt corrige** : sur la photo
+annotée, toucher une zone vide ajoute une pièce manquée (en bleu), toucher une boîte
+l'enlève. Le geste inverse sert autant — une boîte sur le bord de la table coûte un appel à
+l'API et une ligne « non reconnue ».
+
+Les boîtes qui touchent le bord du cadre sont **signalées en orange, pas jetées** : c'est
+soit le bord de la table, soit une main, soit une pièce coupée par le cadre. Dans les trois
+cas il faut l'œil, pas une décision automatique.
 
 ### Pourquoi tout se passe dans le téléphone, sauf l'écriture
 
