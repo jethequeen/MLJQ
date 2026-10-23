@@ -6,7 +6,7 @@
     A LANCER SUR LA MACHINE PROPRIETAIRE (celle que poller_owner.json nomme), dans une
     session PowerShell normale - aucun droit administrateur n'est necessaire.
 
-    Ce qu'elle fait: a l'ouverture de session, puis toutes les 5 minutes, elle execute une
+    Ce qu'elle fait: a l'ouverture de session, puis toutes les minutes, elle execute une
     passe de la file du telephone et de l'auto-apply, sans fenetre et sans GUI ouvert.
 
     Pourquoi "a l'ouverture de session" et non "au demarrage": le projet vit sur Google
@@ -22,7 +22,7 @@
 #>
 param(
     [string] $Machine = 'Plex',
-    [int]    $Minutes = 5,
+    [int]    $Minutes = 1,
     [switch] $Force
 )
 

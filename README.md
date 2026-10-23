@@ -477,7 +477,7 @@ Le GUI traitait la file du téléphone tant qu'il était ouvert — et gardait s
 machine propriétaire, ce qui était la friction numéro un du projet.
 
 `install_poller_task.ps1`, lancé **sur la machine propriétaire**, installe une tâche qui
-exécute `process_remote.bat` à l'ouverture de session puis toutes les 5 minutes :
+exécute `process_remote.bat` à l'ouverture de session puis **toutes les minutes** :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\install_poller_task.ps1"
@@ -486,13 +486,21 @@ powershell -ExecutionPolicy Bypass -File ".\install_poller_task.ps1"
 **Un processus neuf à chaque passage relit le code depuis Drive** : une modification prend
 effet au prochain tour, sans rien redémarrer, et sans que le GUI ait à être ouvert.
 
+**Une minute, et non cinq, depuis le cataloguage par photo.** Fermer une liste de sac met la
+demande dans la file, et l'intervalle est le temps qu'on reste à attendre devant l'écran : à
+cinq minutes c'était la pause la plus longue de la séance. Le coût est réel — chaque passage
+reconstruit l'index du téléphone, donc lit les `.bsx` de chaque set sur Drive — mais il est
+payé par une machine qui ne fait que ça, et `lock.single_instance` empêche deux passages de
+se chevaucher si l'un traîne. Le GUI ouvert, lui, traite la file toutes les 25 secondes
+(`REMOTE_POLL_SECONDS`) ; il n'est pas nécessaire, il est seulement plus prompt.
+
 Quatre choix qui ont chacun une raison :
 
 * **à l'ouverture de session, pas au démarrage** — le projet vit sur Google Drive, et `G:`
   n'existe que dans une session ouverte. Une tâche lancée au boot ne trouverait rien. D'où
   aussi le délai de 2 minutes, le temps que Drive monte ;
-* **par `run_poller_hidden.vbs`** — sans lui, une console noire clignoterait toutes les
-  5 minutes sur la machine où l'on travaille ;
+* **par `run_poller_hidden.vbs`** — sans lui, une console noire clignoterait chaque minute
+  sur la machine où l'on travaille ;
 * **seulement sur la machine propriétaire** — le script refuse de s'installer ailleurs. À
   l'exécution, `lock.owns()` protège déjà : un autre poste se retire tout seul ;
 * **`lock.single_instance`**, un verrou local, parce que celui de Drive arbitre entre
