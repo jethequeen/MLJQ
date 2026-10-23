@@ -2979,24 +2979,27 @@
     return h + '</span>';
   }
 
-  /** Les noms de sacs à proposer, lus dans ceux qui existent.
+  /** Les DEUX noms à proposer, lus dans les sacs qui existent.
    *
-   *  `next` : le prochain GROS sac. `subs` : pour chaque gros déjà commencé, son prochain
-   *  petit (1 seul → « 1 - 1 » ; 3 et 3-1 → « 3 - 2 »). Le PC n'en publie que deux dans
-   *  `next_bags`, ceux du plus grand numéro ; ici on les a tous, parce que rien n'oblige à
-   *  finir le sac 3 avant d'ajouter un petit sac au 1. */
+   *  Ils portent sur le gros sac EN COURS, c'est-à-dire le plus grand numéro, et sur lui
+   *  seul : avec un fichier « 4 », ce sont « 4 - 1 » et « 5 » ; une fois « 4 - 1 » écrit,
+   *  « 4 - 2 » et « 5 ». Proposer un petit sac pour chaque gros existant (1-2, 2-2, 3-2)
+   *  était une complication de ma part — on catalogue les piles dans l'ordre, donc revenir
+   *  au sac 1 quand on est rendu au 4 n'arrive pas.
+   *
+   *  `done` reste à part : ajouter à un sac déjà fait est un autre geste, et il est permis. */
   function catBagChoices(d){
-    var mains = {}, rx = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/;
+    var top = 0, sub = 0, rx = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/;
     (d.bags || []).forEach(function(b){
       var m = rx.exec(b);
       if(!m) return;
       var n = parseInt(m[1], 10), s = m[2] ? parseInt(m[2], 10) : 0;
-      if(!(n in mains) || s > mains[n]) mains[n] = s;
+      if(n > top){ top = n; sub = s; }
+      else if(n === top && s > sub){ sub = s; }
     });
-    var nums = Object.keys(mains).map(Number).sort(function(a, b){ return a - b; });
     return {
-      next: String((nums.length ? nums[nums.length - 1] : 0) + 1),
-      subs: nums.map(function(n){ return n + ' - ' + (mains[n] + 1); }),
+      next: String(top + 1),
+      sub: top ? (top + ' - ' + (sub + 1)) : '',
       done: (d.bags || []).slice()
     };
   }
@@ -3091,17 +3094,17 @@
       // différents : ou bien on entame le gros sac suivant, ou bien on fait un petit sac de
       // plus dans un gros déjà commencé. Une liste plate mêlait les deux aux sacs déjà faits.
       var ch = catBagChoices(d);
-      h += '<div class="lbl" style="margin-top:12px">Prochain gros sac</div>'
-         + '<div class="frow"><button class="fchip' + (CAT.bag === ch.next ? ' on' : '')
-         + '" data-bag="' + esc(ch.next) + '">' + esc(ch.next) + '</button></div>';
-      if(ch.subs.length){
-        h += '<div class="lbl">Petit sac d’un gros déjà commencé</div><div class="frow">';
-        ch.subs.forEach(function(b){
-          h += '<button class="fchip' + (CAT.bag === b ? ' on' : '') + '" data-bag="'
-             + esc(b) + '">' + esc(b) + '</button>';
-        });
-        h += '</div>';
+      h += '<div class="lbl" style="margin-top:12px">Quel sac ?</div><div class="frow">';
+      if(ch.sub){
+        h += '<button class="fchip' + (CAT.bag === ch.sub ? ' on' : '') + '" data-bag="'
+           + esc(ch.sub) + '">' + esc(ch.sub) + '</button>';
       }
+      h += '<button class="fchip' + (CAT.bag === ch.next ? ' on' : '') + '" data-bag="'
+         + esc(ch.next) + '">' + esc(ch.next) + '</button></div>';
+      h += '<div class="hint">' + (ch.sub
+             ? esc(ch.sub) + ' = une liste de plus dans le gros sac en cours. '
+               + esc(ch.next) + ' = le gros sac suivant.'
+             : 'Premier sac de ce set.') + '</div>';
       if(ch.done.length){
         h += '<div class="lbl">Ou ajouter à un sac déjà fait</div><div class="frow">';
         ch.done.forEach(function(b){
