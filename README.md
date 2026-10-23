@@ -1670,9 +1670,27 @@ même luminance que la table sous l'ombre. Aucun seuil ne les récupère — en 
 seuil clair, le compte BAISSE (44, puis 43), parce qu'on ramasse l'ombre elle-même.
 
 Plutôt que de dégrader le réglage pour deux pièces, **le doigt corrige** : sur la photo
-annotée, toucher une zone vide ajoute une pièce manquée (en bleu), toucher une boîte
-l'enlève. Le geste inverse sert autant — une boîte sur le bord de la table coûte un appel à
-l'API et une ligne « non reconnue ».
+annotée, on **trace** un cadre autour de la pièce manquée (il apparaît en bleu), et toucher
+une boîte l'enlève. Le geste inverse sert autant — une boîte sur le bord de la table coûte un
+appel à l'API et une ligne « non reconnue ».
+
+Le tracé, et pas seulement le toucher, parce qu'un point ne décrit pas une pièce : il faut
+une taille ET une proportion. Une Plate 2 x 10 ne rentre dans aucun carré — mesuré, le carré
+de 7 % que posait le toucher fait 77 px de côté là où la pièce en demande 495 sur 66. Un
+simple toucher pose encore un petit cadre, qui suffit pour une pièce menue.
+
+### Voir une fusion, faute de pouvoir la détecter
+
+La réponse de Brickognize porte **sa propre boîte de détection** — ce qu'il a réellement
+regardé dans la découpe. Elle est dessinée sur la vignette, à l'écran de validation, et c'est
+le seul moyen de voir une fusion : sur une découpe qui contient deux pièces, le cadre n'en
+entoure qu'une.
+
+Automatiser ce signal ne marche pas, et c'est mesuré : en fabriquant la fusion exprès sur la
+photo dense, elle couvre 40 % de la découpe contre 50 et 51 % pour les deux pièces prises
+séparément. Trop proche pour trancher. Pire, la fusion rend « Plate 1 x 8 » à **0,87** quand
+la pièce seule qu'elle écrase sortait à 0,64 : le score récompense l'erreur. En dessous de
+55 % de couverture le cadre passe en orange — une invitation à regarder, pas un verdict.
 
 Les boîtes qui touchent le bord du cadre sont **signalées en orange, pas jetées** : c'est
 soit le bord de la table, soit une main, soit une pièce coupée par le cadre. Dans les trois
