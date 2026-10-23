@@ -101,10 +101,19 @@
   .ctally div{ flex:1; background:var(--bg); border-radius:9px; padding:7px 8px; }
   .ctally i{ display:block; font-style:normal; font-size:10.5px; color:var(--mute); }
   .ctally b{ font-size:15px; font-weight:700; }
-  .shotwrap{ position:relative; margin-top:11px; }
-  /* touch-action:none — sinon le doigt qui TRACE fait défiler la page au lieu de dessiner */
-  .shot{ width:100%; border-radius:11px; display:block; background:var(--line);
-         touch-action:none; }
+  /* La photo est une FENÊTRE : l'image bouge et grandit dedans, la page ne bouge pas.
+     touch-action:none sur le cadre, sinon le navigateur prend le geste pour un défilement
+     et on ne peut ni tracer ni déplacer. */
+  .shotwrap{ position:relative; margin-top:11px; overflow:hidden; border-radius:11px;
+             background:var(--line); touch-action:none; }
+  .shot{ width:100%; display:block; transform-origin:0 0; }
+  .drawtog{ position:absolute; top:8px; right:8px; z-index:3; width:40px; height:40px;
+            border-radius:11px; border:0; font-size:19px; line-height:1;
+            background:rgba(255,255,255,.88); color:#1f2328;
+            box-shadow:0 1px 6px rgba(0,0,0,.28); }
+  .drawtog.on{ background:#2563eb; color:#fff; }
+  .zoomtag{ position:absolute; left:8px; top:8px; z-index:3; font-size:11px; font-weight:700;
+            padding:4px 8px; border-radius:999px; background:rgba(0,0,0,.45); color:#fff; }
   .selbox{ position:absolute; border:2px solid #2563eb; background:rgba(37,99,235,.18);
            pointer-events:none; display:none; border-radius:2px; }
   /* La vignette d'une découpe, à l'exacte proportion de la découpe : sans ça la boîte de
@@ -117,10 +126,22 @@
   .xn{ font-size:12px; font-weight:750; color:var(--mute); flex:none; margin-left:-4px; }
   .thumbrow{ display:flex; flex-wrap:wrap; gap:7px; padding:9px 0 2px;
              border-top:1px solid var(--line); }
-  .thb{ position:relative; border:0; background:none; padding:0; line-height:0; }
-  .thb .x{ position:absolute; top:-5px; right:-5px; background:var(--card);
-           border:1px solid var(--line); border-radius:999px; width:16px; height:16px;
-           font-size:9px; line-height:14px; color:var(--mute); }
+  .thb{ position:relative; display:inline-block; line-height:0; }
+  .thb .x{ position:absolute; top:-6px; right:-6px; background:var(--card);
+           border:1px solid var(--line); border-radius:999px; width:18px; height:18px;
+           font-size:9px; line-height:16px; color:var(--mute); padding:0; }
+  .thz{ border:0; background:none; padding:0; line-height:0; }
+  .qty.ok{ color:var(--mute); }
+  .qty.ok.on{ color:var(--green); }
+  /* La découpe en grand : 46 px ne suffisent pas à juger d'une pièce, et c'est EXACTEMENT
+     l'image qui est partie chez Brickognize, cadre de détection compris. */
+  .cropzoom{ position:fixed; inset:0; z-index:25; background:rgba(0,0,0,.82);
+             display:flex; align-items:center; justify-content:center; padding:18px; }
+  .cropzoom .inner{ position:relative; max-width:100%; max-height:80vh; }
+  .cropzoom img{ max-width:100%; max-height:80vh; display:block; border-radius:8px; }
+  .cropzoom .bb{ position:absolute; border:2px solid #16a34a; box-sizing:border-box; }
+  .cropzoom .cap{ position:absolute; left:0; right:0; bottom:-30px; text-align:center;
+                  color:#fff; font-size:12px; }
   .find{ display:flex; align-items:center; gap:10px; padding:9px 0;
          border-top:1px solid var(--line); }
   .find > img{ width:46px; height:46px; object-fit:contain; border-radius:7px;
@@ -1915,14 +1936,16 @@
 
   var CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
              lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-             finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}};
+             finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}, okd:{}, zoom:0,
+             view:{k:1, x:0, y:0}, drawing:false};
 
   function openCat(key, bag){
     var s = SETS.filter(function(x){ return x.key === key; })[0];
     if(!s) return;
     CAT = {key:key, number:s.number, name:s.name, bag:String(bag || ''), data:null,
            loading:true, err:null, lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null,
-           boxes:[], overlay:'', finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}};
+           boxes:[], overlay:'', finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}, okd:{}, zoom:0,
+             view:{k:1, x:0, y:0}, drawing:false};
     render();
     google.script.run.withSuccessHandler(function(d){
       if(CAT.key !== key) return;
@@ -1957,7 +1980,8 @@
     if(CAT.shot && CAT.shot.bmp && CAT.shot.bmp.close) try{ CAT.shot.bmp.close(); }catch(e){}
     CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
            lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-           finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}};
+           finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}, okd:{}, zoom:0,
+             view:{k:1, x:0, y:0}, drawing:false};
     render();
   }
 
@@ -2606,7 +2630,9 @@
 
   function catOverlay(){
     var bmp = CAT.shot.bmp;
-    var W = Math.min(1000, bmp.width), k = W / bmp.width;
+    // 1600 px et non 1000 : on peut zoomer jusqu'à ×8 là-dedans, et une image de 1000 px
+    // grossie quatre fois ne montre plus rien — le zoom servirait à voir du flou.
+    var W = Math.min(1600, bmp.width), k = W / bmp.width;
     var cv = document.createElement('canvas');
     cv.width = W; cv.height = Math.round(bmp.height * k);
     var c = cv.getContext('2d');
@@ -2615,21 +2641,170 @@
     // par celle de la photo.
     var kx = cv.width / CAT.work.w, ky = cv.height / CAT.work.h;
     c.lineWidth = Math.max(2, Math.round(W / 320));
-    c.font = '700 ' + Math.round(W / 26) + 'px -apple-system, system-ui, sans-serif';
-    CAT.boxes.forEach(function(b, i){
+    // Pas de numéro dessiné : l'étiquette prenait plus de place que la pièce sur les petites
+    // boîtes, et la liste de validation se lit par lot avec ses vignettes, plus par numéro.
+    CAT.boxes.forEach(function(b){
       // Vert : trouvée. Orange : touche le bord du cadre — bord de table, main, ou pièce
       // coupée, ça demande l'œil. Bleu : ajoutée au doigt.
-      var col = b.manual ? '#2563eb' : (b.edge ? '#d97706' : '#16a34a');
-      var x = b.x * kx, y = b.y * ky, w = b.w * kx, h = b.h * ky;
-      c.strokeStyle = col;
-      c.strokeRect(x, y, w, h);
-      var t = String(i + 1), tw = c.measureText(t).width;
-      c.fillStyle = col;
-      c.fillRect(x, Math.max(0, y - W / 22), tw + W / 48, W / 22);
-      c.fillStyle = '#fff';
-      c.fillText(t, x + W / 96, Math.max(W / 28, y - W / 180));
+      c.strokeStyle = b.manual ? '#2563eb' : (b.edge ? '#d97706' : '#16a34a');
+      c.strokeRect(b.x * kx, b.y * ky, b.w * kx, b.h * ky);
     });
-    return cv.toDataURL('image/jpeg', 0.8);
+    return cv.toDataURL('image/jpeg', 0.85);
+  }
+
+  // ── La photo comme une fenêtre : pincer, glisser, dessiner ──────────────────
+  // Zoomer la PAGE cassait la navigation : on se retrouvait à faire défiler un écran trop
+  // grand pour viser une pièce de trois millimètres. La photo est donc son propre viewport —
+  // on pince pour grossir, on glisse pour se promener, exactement comme dans une galerie.
+  //
+  // Et le tracé ne peut pas partager le geste du glissement : les deux sont un doigt qui se
+  // déplace. D'où le petit bouton qui bascule entre les deux. Le ZOOM, lui, n'a aucun bouton :
+  // il se pince, et il se pince même en mode dessin — on cadre et on trace sans rien basculer.
+
+  function catViewApply(){
+    var im = document.getElementById('catshot');
+    if(im) im.style.transform = 'translate(' + CAT.view.x + 'px,' + CAT.view.y + 'px) scale('
+                              + CAT.view.k + ')';
+    var tag = document.getElementById('catzoom');
+    if(tag){
+      tag.textContent = '×' + CAT.view.k.toFixed(1);
+      tag.style.display = CAT.view.k > 1.02 ? '' : 'none';
+    }
+  }
+
+  /** L'image ne sort jamais du cadre : au repos elle le remplit, et elle ne peut pas être
+   *  poussée au point de laisser du vide sur un côté. */
+  function catViewClamp(){
+    var wrap = document.getElementById('catwrap'), im = document.getElementById('catshot');
+    if(!wrap || !im) return;
+    var cw = wrap.clientWidth, chh = im.clientHeight || wrap.clientHeight;
+    CAT.view.k = Math.max(1, Math.min(8, CAT.view.k));
+    var w = cw * CAT.view.k, hh = chh * CAT.view.k;
+    CAT.view.x = Math.min(0, Math.max(cw - w, CAT.view.x));
+    CAT.view.y = Math.min(0, Math.max(chh - hh, CAT.view.y));
+  }
+
+  function catWire(app){
+    var wrap = app.querySelector('#catwrap');
+    var shot = app.querySelector('#catshot');
+    var sel = app.querySelector('#catsel');
+    var tog = app.querySelector('#catdraw');
+    if(!wrap || !shot || !sel) return;
+    catViewApply();
+
+    if(tog) tog.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      CAT.drawing = !CAT.drawing;
+      tog.classList.toggle('on', CAT.drawing);
+      tog.textContent = CAT.drawing ? '✏️' : '✋';
+      toast(CAT.drawing ? 'Mode dessin — trace un cadre (le pincement zoome toujours)'
+                        : 'Mode navigation — glisse et pince');
+    });
+
+    var pts = {}, n = 0, last = null, pinch = null, drag = null, moved = 0;
+
+    function local(ev){
+      var r = wrap.getBoundingClientRect();
+      return {x:ev.clientX - r.left, y:ev.clientY - r.top};
+    }
+    /** Point du cadre -> fraction de l'IMAGE, en défaisant le zoom et le déplacement. */
+    function frac(p){
+      var cw = wrap.clientWidth, chh = shot.clientHeight || wrap.clientHeight;
+      return {x:(p.x - CAT.view.x) / (cw * CAT.view.k),
+              y:(p.y - CAT.view.y) / (chh * CAT.view.k)};
+    }
+    function paint(a, b){
+      sel.style.display = 'block';
+      sel.style.left = Math.min(a.x, b.x) + 'px';
+      sel.style.top = Math.min(a.y, b.y) + 'px';
+      sel.style.width = Math.abs(b.x - a.x) + 'px';
+      sel.style.height = Math.abs(b.y - a.y) + 'px';
+    }
+    function two(){
+      var ks = Object.keys(pts);
+      return [pts[ks[0]], pts[ks[1]]];
+    }
+
+    wrap.addEventListener('pointerdown', function(ev){
+      if(ev.target === tog) return;
+      pts[ev.pointerId] = local(ev); n++;
+      try{ wrap.setPointerCapture(ev.pointerId); }catch(e){}
+      if(n === 1){
+        last = pts[ev.pointerId]; moved = 0;
+        drag = CAT.drawing ? pts[ev.pointerId] : null;
+      } else if(n === 2){
+        // Un pincement qui commence annule le tracé en cours : on cadrait, on ne dessinait pas.
+        drag = null; sel.style.display = 'none';
+        var t = two();
+        pinch = {d:Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y),
+                 mx:(t[0].x + t[1].x) / 2, my:(t[0].y + t[1].y) / 2, k:CAT.view.k,
+                 vx:CAT.view.x, vy:CAT.view.y};
+      }
+      ev.preventDefault();
+    });
+
+    wrap.addEventListener('pointermove', function(ev){
+      if(!(ev.pointerId in pts)) return;
+      var p = local(ev);
+      pts[ev.pointerId] = p;
+      if(n >= 2 && pinch){
+        var t = two();
+        if(t[0] && t[1]){
+          var d = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y);
+          var k = Math.max(1, Math.min(8, pinch.k * (d / (pinch.d || 1))));
+          // Le point de l'image qu'on a pincé reste sous le MILIEU COURANT des deux doigts :
+          // on zoome et on se déplace du même geste, comme dans n'importe quelle galerie.
+          var mx = (t[0].x + t[1].x) / 2, my = (t[0].y + t[1].y) / 2;
+          CAT.view.k = k;
+          CAT.view.x = mx - (pinch.mx - pinch.vx) * (k / pinch.k);
+          CAT.view.y = my - (pinch.my - pinch.vy) * (k / pinch.k);
+          catViewClamp(); catViewApply();
+        }
+      } else if(drag){
+        paint(drag, p);
+      } else if(last){
+        moved += Math.abs(p.x - last.x) + Math.abs(p.y - last.y);
+        CAT.view.x += p.x - last.x;
+        CAT.view.y += p.y - last.y;
+        last = p;
+        catViewClamp(); catViewApply();
+      }
+      ev.preventDefault();
+    });
+
+    function up(ev){
+      if(!(ev.pointerId in pts)) return;
+      var p = pts[ev.pointerId];
+      delete pts[ev.pointerId]; n = Math.max(0, n - 1);
+      try{ wrap.releasePointerCapture(ev.pointerId); }catch(e){}
+      if(n === 0){
+        if(drag){
+          sel.style.display = 'none';
+          var a = frac(drag), b = frac(p);
+          var dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+          drag = null; last = null; pinch = null;
+          // Un tracé minuscule est un toucher : on enlève la boîte visée, ou on en pose une
+          // petite. Le seuil est en fraction de l'image, pour ne pas dépendre de l'écran
+          // NI DU ZOOM — à ×4, trois millimètres de doigt font déjà un vrai cadre.
+          if(dx < 0.012 && dy < 0.012) return catTap(a.x, a.y);
+          return catDraw(Math.min(a.x, b.x), Math.min(a.y, b.y), dx, dy);
+        }
+        // En navigation, un doigt posé et relevé sans bouger enlève la boîte visée.
+        if(!CAT.drawing && moved < 6 && last){
+          var f = frac(p);
+          if(f.x >= 0 && f.x <= 1 && f.y >= 0 && f.y <= 1) catTap(f.x, f.y, true);
+        }
+        last = null; pinch = null; drag = null;
+      } else if(n === 1){
+        var ks = Object.keys(pts);
+        last = pts[ks[0]]; pinch = null;
+      }
+    }
+    wrap.addEventListener('pointerup', up);
+    wrap.addEventListener('pointercancel', function(ev){
+      delete pts[ev.pointerId]; n = Math.max(0, n - 1);
+      drag = null; pinch = null; sel.style.display = 'none';
+    });
   }
 
   /** Le doigt sur la photo annotée : enlever la boîte touchée, ou en ajouter une là.
@@ -2640,7 +2815,7 @@
    *  réglage qui dégrade le reste. Et le geste inverse sert autant : une boîte sur le bord
    *  de la table coûte un appel et une ligne « non reconnue ».
    */
-  function catTap(fx, fy){
+  function catTap(fx, fy, removeOnly){
     var w = CAT.work.w, h = CAT.work.h;
     var px = fx * w, py = fy * h;
     for(var i = 0; i < CAT.boxes.length; i++){
@@ -2653,6 +2828,10 @@
         return;
       }
     }
+    // En navigation, poser le doigt ne doit RIEN créer : on se promène dans l'image, et voir
+    // un cadre apparaître sous le doigt serait une surprise. Enlever, oui — c'est sans risque
+    // et c'est le geste qu'on a en main quand on repère une boîte en trop.
+    if(removeOnly) return;
     var side = Math.round(w * 0.07);
     catAddManual(Math.round(px - side / 2), Math.round(py - side / 2), side, side);
     toast('Petit cadre posé — trace-le au doigt si la pièce dépasse');
@@ -2699,6 +2878,7 @@
           render(); return;
         }
         CAT.overlay = catOverlay();
+        CAT.view = {k:1, x:0, y:0};      // une photo neuve repart au cadrage d'origine
         CAT.stage = 'segment'; CAT.busy = ''; render();
       }catch(e){
         CAT.stage = 'idle'; CAT.busy = ''; toast('Découpage impossible : ' + e.message); render();
@@ -2905,7 +3085,7 @@
     if(!n){ toast('Rien à ajouter'); return; }
     CAT.photos++;
     CAT.finds = []; CAT.boxes = []; CAT.overlay = ''; CAT.stage = 'idle';
-    CAT.bump = {}; CAT.open = null;
+    CAT.bump = {}; CAT.open = null; CAT.okd = {}; CAT.zoom = 0;
     catSave(function(){
       toast(pieces + ' pièce(s) ajoutée(s) au sac ' + CAT.bag
             + (absent ? ' — ' + absent + ' non reconnue(s), à faire à la main' : ''));
@@ -3090,7 +3270,11 @@
     out.forEach(function(g){
       g.weak = g.members.slice().sort(function(a, b){
         return findRank(a) - findRank(b); })[0];
-      g.why = findWhy(g.weak);
+      // Validé à la main : l'œil a tranché, le lot sort de la liste à vérifier. La clé du
+      // lot porte la pièce ET la couleur, donc réassigner le lot annule la validation — ce
+      // qui est juste : ce n'est plus la même chose qu'on avait regardée.
+      g.ok = !g.solo && !!CAT.okd[g.gid];
+      g.why = g.ok ? [] : findWhy(g.weak);
       g.status = g.solo ? 'absent' : (g.why.length ? 'doubt' : 'ok');
       g.bump = Math.max(0, CAT.bump[g.gid] || 0);
       g.qty = g.members.length + g.bump;
@@ -3098,11 +3282,36 @@
     return out;
   }
 
+  /** La découpe en grand, telle qu'elle est partie chez Brickognize, cadre de détection
+   *  compris. Quarante-six pixels ne suffisent pas à juger d'une pièce — et c'est là qu'on
+   *  voit si le cadre n'entoure qu'une des deux pièces d'une découpe fusionnée. */
+  function catZoomHtml(){
+    if(!CAT.zoom) return '';
+    var f = CAT.finds.filter(function(x){ return x.i === CAT.zoom; })[0];
+    if(!f || !f.crop) return '';
+    var h = '<div class="cropzoom" data-unzoom="1"><div class="inner">'
+          + '<img src="' + f.crop + '">';
+    if(f.bb){
+      var b = f.bb;
+      h += '<span class="bb" style="left:' + (b.l * 100).toFixed(1) + '%;top:'
+         + (b.u * 100).toFixed(1) + '%;width:' + ((b.r - b.l) * 100).toFixed(1)
+         + '%;height:' + ((b.d - b.u) * 100).toFixed(1) + '%"></span>';
+    }
+    var cap = f.pick
+      ? esc(f.pick.lot.name || f.pick.lot.id) + ' · ' + esc(f.pick.lot.color_name || '')
+        + ' · ' + Math.round(f.pick.si * 100) + ' %'
+      : 'aucun candidat du set';
+    if(f.bb) cap += ' · cadre vert : ce que Brickognize a regardé';
+    h += '<div class="cap">' + cap + '<br>touche pour fermer</div>';
+    return h + '</div></div>';
+  }
+
   function catGroupHtml(g){
     var h = '<div class="find ' + g.status + '">';
     // La vignette montrée est celle de la découpe la plus faible : c'est celle qui mérite
     // l'œil, et elle porte la boîte de Brickognize. Les autres s'ouvrent avec la ligne.
-    h += catThumb(g.weak);
+    // Elle se touche pour s'agrandir — 46 px ne suffisent pas à juger d'une pièce.
+    h += '<button class="thz" data-zoom="' + g.weak.i + '">' + catThumb(g.weak) + '</button>';
     if(g.members.length > 1){
       h += '<span class="xn">×' + g.members.length + '</span>';
     }
@@ -3110,7 +3319,8 @@
       var l = g.lot, p = g.weak.pick, pc = Math.round(p.si * 100);
       var cls = p.si >= SURE_ITEM ? 'good' : (p.si >= 0.4 ? 'mid' : 'bad');
       var note = g.why.slice();
-      if(!g.why.length){
+      if(g.ok) note.push('validé à la main');
+      if(!g.why.length && !g.ok){
         if(p.deduced) note.push('couleur déduite');
         if(p.manual) note.push('choisie à la main');
       }
@@ -3118,7 +3328,12 @@
       h += '<button class="ft" data-gcand="' + esc(g.gid) + '">' + esc(l.name || l.id)
          + '<span>' + esc(l.color_name || ('couleur ' + l.color)) + ' · ' + esc(l.id)
          + (note.length ? ' · ' + esc(note.join(' · ')) : '') + '</span></button>';
-      h += '<span class="sc ' + cls + '">' + pc + '%</span>';
+      // Validé : un crochet, pas « 100 % ». La note est celle de Brickognize, et la réécrire
+      // à 100 laisserait croire que la machine était sûre alors que c'est l'œil qui a tranché.
+      h += g.ok ? '<span class="sc good">✓</span>'
+                : '<span class="sc ' + cls + '">' + pc + '%</span>';
+      h += '<button class="qty ok' + (g.ok ? ' on' : '') + '" data-gok="' + esc(g.gid)
+         + '" title="Valider ce lot">✓</button>';
       h += '<span class="qty"><button data-gless="' + esc(g.gid) + '">−</button><b>' + g.qty
          + '</b><button data-gmore="' + esc(g.gid) + '">+</button></span>';
     } else {
@@ -3136,8 +3351,10 @@
       if(g.members.length > 1){
         h += '<div class="thumbrow">';
         g.members.forEach(function(f){
-          h += '<button class="thb" data-thumb="' + f.i + '" title="Retirer cette découpe">'
-             + catThumb(f) + '<span class="x">✕</span></button>';
+          h += '<span class="thb">'
+             + '<button class="thz" data-zoom="' + f.i + '">' + catThumb(f) + '</button>'
+             + '<button class="x" data-thumb="' + f.i + '" '
+             + 'title="Retirer cette découpe">✕</button></span>';
         });
         h += '</div>';
       }
@@ -3145,7 +3362,7 @@
       pairs.forEach(function(p, i){
         var on = (g.weak.pick === p);
         h += '<button class="cand' + (on ? ' on' : '') + '" data-gpick="' + esc(g.gid)
-           + ':' + i + '">'
+           + '~' + i + '">'
            + '<img src="' + partImg({type:p.lot.type, color_id:p.lot.color, id:p.lot.id})
            + '" onerror="this.style.visibility=&quot;hidden&quot;">'
            + '<span class="ct">' + esc(p.lot.name || p.lot.id)
@@ -3164,7 +3381,7 @@
           if(fold(li.name + ' ' + li.id + ' ' + li.color_name).indexOf(q) >= 0) hits.push(li);
         }
         hits.slice(0, 12).forEach(function(li){
-          h += '<button class="cand" data-gman="' + esc(g.gid) + ':' + esc(li.k) + '">'
+          h += '<button class="cand" data-gman="' + esc(g.gid) + '~' + esc(li.k) + '">'
              + '<img src="' + partImg({type:li.type, color_id:li.color, id:li.id})
              + '" onerror="this.style.visibility=&quot;hidden&quot;">'
              + '<span class="ct">' + esc(li.name || li.id) + '<span>'
@@ -3231,14 +3448,19 @@
       h += '<div class="rep">' + esc(CAT.busy || '…') + '</div>';
     } else if(CAT.stage === 'segment'){
       var nEdge = CAT.boxes.filter(function(b){ return b.edge; }).length;
-      h += '<div class="shotwrap"><img class="shot" id="catshot" src="' + CAT.overlay + '">'
-         + '<div class="selbox" id="catsel"></div></div>';
+      h += '<div class="shotwrap" id="catwrap">'
+         + '<img class="shot" id="catshot" src="' + CAT.overlay + '">'
+         + '<div class="selbox" id="catsel"></div>'
+         + '<div class="zoomtag" id="catzoom" style="display:none">×1.0</div>'
+         + '<button class="drawtog' + (CAT.drawing ? ' on' : '') + '" id="catdraw">'
+         + (CAT.drawing ? '✏️' : '✋') + '</button></div>';
       h += '<div class="hint"><b>' + CAT.boxes.length + ' pièce(s) découpée(s)'
          + (nEdge ? ', dont ' + nEdge + ' au bord du cadre (orange)' : '') + '.</b><br>'
-         + 'Une pièce manquée ? <b>Trace un cadre autour</b> avec le doigt — une Plate 2 x 10 '
-         + 'ne rentre pas dans un carré. Un simple toucher pose un petit cadre, pour une '
-         + 'pièce menue. Une boîte en trop (le bord de la table, ta main) ? '
-         + '<b>Touche-la pour l’enlever.</b><br>'
+         + '<b>Pince pour zoomer, glisse pour te promener</b> — dans la photo, pas dans la '
+         + 'page. Touche une boîte en trop pour l’enlever.<br>'
+         + 'Le bouton ✋/✏️ bascule en <b>mode dessin</b> : là, le doigt trace un cadre autour '
+         + 'd’une pièce manquée (une Plate 2 x 10 ne rentre pas dans un carré). Le pincement '
+         + 'continue de zoomer même en mode dessin, donc on cadre et on trace sans basculer.<br>'
          + 'Mais si DEUX pièces sont dans une seule boîte, reprends la photo : c’est la seule '
          + 'erreur que rien ne rattrape plus loin. Deux plaques collées se font reconnaître '
          + 'comme une seule grande plaque, avec une bonne note — ni le score ni l’inventaire '
@@ -3340,6 +3562,7 @@
       });
       h += '</div>';
     }
+    h += catZoomHtml();
     app.innerHTML = h;
     wireCat(app);
   }
@@ -3358,56 +3581,7 @@
         CAT.stage = 'idle'; CAT.boxes = []; CAT.overlay = ''; render(); }); });
     app.querySelectorAll('[data-cat-go]').forEach(function(b){
       b.addEventListener('click', catRecognise); });
-    // Tracer un cadre, ou toucher. Un simple clic ne peut pas décrire une Plate 2 x 10 :
-    // il ne donne qu'un point, donc un carré de taille arbitraire, et la pièce dépasse.
-    // Le tracé donne les deux choses qui manquent — la taille ET la proportion.
-    var shot = app.querySelector('#catshot');
-    var sel = app.querySelector('#catsel');
-    if(shot && sel){
-      var drag = null;
-      var at = function(ev){
-        var r = shot.getBoundingClientRect();
-        if(!r.width || !r.height) return null;
-        return {x:(ev.clientX - r.left) / r.width, y:(ev.clientY - r.top) / r.height,
-                w:r.width, h:r.height};
-      };
-      var paint = function(a, b){
-        sel.style.display = 'block';
-        sel.style.left = (Math.min(a.x, b.x) * a.w) + 'px';
-        sel.style.top = (Math.min(a.y, b.y) * a.h) + 'px';
-        sel.style.width = (Math.abs(b.x - a.x) * a.w) + 'px';
-        sel.style.height = (Math.abs(b.y - a.y) * a.h) + 'px';
-      };
-      shot.addEventListener('pointerdown', function(ev){
-        var p = at(ev);
-        if(!p || p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return;
-        drag = p;
-        try{ shot.setPointerCapture(ev.pointerId); }catch(e){}
-        ev.preventDefault();
-      });
-      shot.addEventListener('pointermove', function(ev){
-        if(!drag) return;
-        var p = at(ev);
-        if(p) paint(drag, p);
-        ev.preventDefault();
-      });
-      var finish = function(ev){
-        if(!drag) return;
-        var a = drag, b = at(ev) || drag;
-        drag = null;
-        sel.style.display = 'none';
-        try{ shot.releasePointerCapture(ev.pointerId); }catch(e){}
-        var dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
-        // Un tracé minuscule est un toucher : on enlève la boîte visée, ou on en pose une
-        // petite. Le seuil est en fraction de l'image, pour ne pas dépendre de l'écran.
-        if(dx < 0.03 && dy < 0.03) return catTap(a.x, a.y);
-        catDraw(Math.min(a.x, b.x), Math.min(a.y, b.y), dx, dy);
-      };
-      shot.addEventListener('pointerup', finish);
-      shot.addEventListener('pointercancel', function(){
-        drag = null; sel.style.display = 'none';
-      });
-    }
+    catWire(app);
     app.querySelectorAll('[data-cat-cancel]').forEach(function(b){
       b.addEventListener('click', function(){
         CAT.stage = 'idle'; CAT.finds = []; CAT.boxes = []; CAT.overlay = ''; render(); }); });
@@ -3445,7 +3619,7 @@
       }); });
     app.querySelectorAll('[data-gpick]').forEach(function(b){
       b.addEventListener('click', function(){
-        var v = b.getAttribute('data-gpick'), at = v.lastIndexOf(':');
+        var v = b.getAttribute('data-gpick'), at = v.indexOf('~');
         var g = group(v.slice(0, at)), idx = Number(v.slice(at + 1));
         if(!g) return;
         // Le choix vaut pour TOUTES les découpes du lot : elles disaient la même pièce, elles
@@ -3461,7 +3635,10 @@
       }); });
     app.querySelectorAll('[data-gman]').forEach(function(b){
       b.addEventListener('click', function(){
-        var v = b.getAttribute('data-gman'), at = v.indexOf(':');
+        // indexOf('~') et non indexOf(':') : le gid vaut « k:3023|5|N », donc le premier
+        // deux-points est celui du préfixe. On découpait sur lui, group() recevait « k », et
+        // AUCUNE sélection manuelle n'aboutissait — le clic ne faisait simplement rien.
+        var v = b.getAttribute('data-gman'), at = v.indexOf('~');
         var g = group(v.slice(0, at)), l = catInv()[v.slice(at + 1)];
         if(!g || !l) return;
         // Choisie à la main : la note n'a plus de sens, et la donner à 100 % laisserait
@@ -3497,10 +3674,25 @@
         render();
       }); });
     app.querySelectorAll('[data-thumb]').forEach(function(b){
-      b.addEventListener('click', function(){
+      b.addEventListener('click', function(ev){
+        ev.stopPropagation();
         var ff = find(b.getAttribute('data-thumb'));
         if(ff){ ff.drop = true; render(); }
       }); });
+    app.querySelectorAll('[data-gok]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var gid = b.getAttribute('data-gok');
+        if(CAT.okd[gid]) delete CAT.okd[gid]; else CAT.okd[gid] = true;
+        render();
+      }); });
+    app.querySelectorAll('[data-zoom]').forEach(function(b){
+      b.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        CAT.zoom = Number(b.getAttribute('data-zoom'));
+        render();
+      }); });
+    app.querySelectorAll('[data-unzoom]').forEach(function(b){
+      b.addEventListener('click', function(){ CAT.zoom = 0; render(); }); });
     app.querySelectorAll('[data-lmore]').forEach(function(b){
       b.addEventListener('click', function(){
         var k = b.getAttribute('data-lmore');
