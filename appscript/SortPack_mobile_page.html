@@ -2579,10 +2579,19 @@
   }
 
   function catShot(file){
-    CAT.stage = 'working'; CAT.busy = 'Découpage…'; CAT.finds = []; render();
+    CAT.stage = 'working'; CAT.busy = 'Analyse de la photo…'; CAT.finds = []; render();
     var done = function(bmp){
+      CAT.shot = {bmp:bmp, w:bmp.width, h:bmp.height};
+      // Le découpage BLOQUE le fil principal une à deux secondes sur un téléphone. Sans ce
+      // setTimeout, le « Découpage… » qu'on vient de poser n'est jamais peint : le navigateur
+      // n'a pas rendu la main entre le render() et le calcul, et l'écran reste figé sur la
+      // vue précédente — ce qui a l'air cassé, pas occupé. Un Worker ferait mieux, mais il
+      // passerait par un Blob URL que la CSP de l'iframe Apps Script peut refuser : on
+      // déboguerait ça au lieu du cataloguage, pour une seconde.
+      setTimeout(function(){ heavy(bmp); }, 0);
+    };
+    var heavy = function(bmp){
       try{
-        CAT.shot = {bmp:bmp, w:bmp.width, h:bmp.height};
         var sm = catDownscale(bmp);
         CAT.work = {w:sm.w, h:sm.h};
         CAT.boxes = segBoxes(sm.rgba, sm.w, sm.h);
