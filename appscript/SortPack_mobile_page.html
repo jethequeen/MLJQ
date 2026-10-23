@@ -132,9 +132,9 @@
            font-size:9px; line-height:16px; color:var(--mute); padding:0; }
   .thz{ border:0; background:none; padding:0; line-height:0; }
   /* L'image du catalogue, à côté de la découpe : la comparaison se fait d'un coup d'œil. */
-  .cat{ width:38px; height:38px; object-fit:contain; flex:none; }
-  .find .ft.sm{ font-size:12.5px; font-weight:650; }
-  .find .ft.sm span{ font-size:10.5px; font-weight:500; line-height:1.3; }
+  .cat{ width:54px; height:54px; object-fit:contain; flex:none; }
+  .find .ft.sm{ font-size:11.5px; font-weight:650; }
+  .find .ft.sm span{ font-size:10px; font-weight:500; line-height:1.3; }
   .qty.ok{ color:var(--mute); }
   .qty.ok.on{ color:var(--green); }
   /* La découpe en grand : 46 px ne suffisent pas à juger d'une pièce, et c'est EXACTEMENT
@@ -152,7 +152,11 @@
                background:var(--bg); flex:none; }
   .find .fno{ position:absolute; margin:-8px 0 0 -8px; background:var(--accent); color:#fff;
               font-size:10px; font-weight:750; border-radius:999px; padding:1px 5px; }
-  .find .ft{ flex:1; min-width:0; font-size:13px; font-weight:600; line-height:1.3; }
+  /* `.ft` est un <button> : sans cette remise a plat, iOS lui dessine un fond blanc et une
+     bordure, et la « boite blanche » poussait tout le reste de la ligne hors de l'ecran. */
+  .find .ft{ flex:1; min-width:0; font-size:13px; font-weight:600; line-height:1.3;
+             border:0; background:none; padding:0; text-align:left; color:inherit;
+             -webkit-appearance:none; appearance:none; }
   .find .ft span{ display:block; font-weight:500; font-size:11.5px; color:var(--mute);
                   margin-top:2px; }
   .find.doubt{ background:rgba(217,119,6,.07); }
@@ -162,6 +166,18 @@
   .qty button{ width:30px; height:30px; border-radius:8px; border:1.5px solid var(--line);
                background:transparent; color:var(--ink); font-size:16px; font-weight:700; }
   .qty b{ min-width:22px; text-align:center; font-size:14px; }
+  /* Le pas a pas EN COLONNE : trois boutons cote a cote mangeaient un quart de la ligne. */
+  .vstep{ display:flex; flex-direction:column; align-items:center; flex:none; width:26px; }
+  .vstep button{ width:26px; height:17px; border:0; background:none; padding:0;
+                 color:var(--accent); font-size:14px; font-weight:800; line-height:17px;
+                 -webkit-appearance:none; appearance:none; }
+  .vstep b{ font-size:13px; font-weight:750; line-height:15px; }
+  .vact{ display:flex; flex-direction:column; align-items:center; flex:none; width:24px;
+         gap:1px; }
+  .vact button{ width:24px; height:22px; border:0; background:none; padding:0; font-size:14px;
+                line-height:22px; color:var(--mute);
+                -webkit-appearance:none; appearance:none; }
+  .vact button.on{ color:var(--green); }
   .cand{ display:flex; align-items:center; gap:9px; width:100%; text-align:left;
          border:0; border-top:1px solid var(--line); background:transparent;
          color:var(--ink); padding:8px 0; }
@@ -3236,9 +3252,18 @@
    *  au sac 1 quand on est rendu au 4 n'arrive pas.
    *
    *  `done` reste à part : ajouter à un sac déjà fait est un autre geste, et il est permis. */
+  /** Les sacs déjà soumis mais pas encore inscrits. Ils comptent comme existants pour le
+   *  choix du nom suivant : après avoir fermé 5-1, on doit se voir proposer 5-2 tout de
+   *  suite, sans attendre que le PC passe. Une liste en ERREUR ne compte pas — son fichier
+   *  n'a jamais été créé, donc son nom est de nouveau libre. */
+  function catPendingBags(){
+    return CAT.sent.filter(function(x){ return x.status !== 'error'; })
+                   .map(function(x){ return x.bag; });
+  }
+
   function catBagChoices(d){
     var top = 0, sub = 0, rx = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/;
-    (d.bags || []).forEach(function(b){
+    (d.bags || []).concat(catPendingBags()).forEach(function(b){
       var m = rx.exec(b);
       if(!m) return;
       var n = parseInt(m[1], 10), s = m[2] ? parseInt(m[2], 10) : 0;
@@ -3248,7 +3273,7 @@
     return {
       next: String(top + 1),
       sub: top ? (top + ' - ' + (sub + 1)) : '',
-      done: (d.bags || []).slice()
+      done: (d.bags || []).concat(catPendingBags())
     };
   }
 
@@ -3307,7 +3332,6 @@
       ? esc(f.pick.lot.name || f.pick.lot.id) + ' · ' + esc(f.pick.lot.color_name || '')
         + ' · ' + Math.round(f.pick.si * 100) + ' %'
       : 'aucun candidat du set';
-    if(f.bb) cap += ' · cadre vert : ce que Brickognize a regardé';
     h += '<div class="cap">' + cap + '<br>touche pour fermer</div>';
     return h + '</div></div>';
   }
@@ -3337,25 +3361,27 @@
       // à rien à l'œil, et il prenait la place de la couleur.
       h += '<img class="cat" src="' + partImg({type:l.type, color_id:l.color, id:l.id})
          + '" onerror="this.style.visibility=&quot;hidden&quot;">';
-      h += '<button class="ft sm" data-gcand="' + esc(g.gid) + '">'
-         + esc(l.color_name || ('couleur ' + l.color))
-         + '<span>' + esc(l.name || l.id)
-         + (note.length ? ' · ' + esc(note.join(' · ')) : '') + '</span></button>';
+      // Plus de couleur en toutes lettres : elle commençait chaque ligne et elle a toujours
+      // été juste — c'est l'image du catalogue, qui est de la bonne couleur, qui la dit.
+      h += '<button class="ft sm" data-gcand="' + esc(g.gid) + '">' + esc(l.name || l.id)
+         + (note.length ? '<span>' + esc(note.join(' · ')) + '</span>' : '')
+         + '</button>';
       // Validé : un crochet, pas « 100 % ». La note est celle de Brickognize, et la réécrire
       // à 100 laisserait croire que la machine était sûre alors que c'est l'œil qui a tranché.
       h += g.ok ? '<span class="sc good">✓</span>'
                 : '<span class="sc ' + cls + '">' + pc + '%</span>';
-      h += '<button class="qty ok' + (g.ok ? ' on' : '') + '" data-gok="' + esc(g.gid)
-         + '" title="Valider ce lot">✓</button>';
-      h += '<span class="qty"><button data-gless="' + esc(g.gid) + '">−</button><b>' + g.qty
-         + '</b><button data-gmore="' + esc(g.gid) + '">+</button></span>';
+      h += '<span class="vstep"><button data-gmore="' + esc(g.gid) + '">+</button><b>'
+         + g.qty + '</b><button data-gless="' + esc(g.gid) + '">−</button></span>';
+      h += '<span class="vact">'
+         + '<button class="' + (g.ok ? 'on' : '') + '" data-gok="' + esc(g.gid)
+         + '" title="Valider ce lot">✓</button>'
+         + '<button data-gdrop="' + esc(g.gid) + '" title="Retirer ce lot">✕</button>'
+         + '</span>';
     } else {
       h += '<button class="ft" data-gcand="' + esc(g.gid) + '">Non reconnue'
          + '<span>' + esc(g.solo.err || 'aucun candidat n’est encore à l’inventaire')
          + ' — choisis-la à la main</span></button>';
     }
-    h += '<button class="qty" data-gdrop="' + esc(g.gid) + '" style="border:0;background:none;'
-       + 'color:var(--mute);font-size:17px;padding:0 2px">✕</button>';
     h += '</div>';
 
     if(CAT.open === g.gid){
@@ -3467,21 +3493,15 @@
          + '<div class="zoomtag" id="catzoom" style="display:none">×1.0</div>'
          + '<button class="drawtog' + (CAT.drawing ? ' on' : '') + '" id="catdraw">'
          + (CAT.drawing ? '✏️' : '✋') + '</button></div>';
-      h += '<div class="hint"><b>' + CAT.boxes.length + ' pièce(s) découpée(s)'
-         + (nEdge ? ', dont ' + nEdge + ' au bord du cadre (orange)' : '') + '.</b><br>'
-         + '<b>Pince pour zoomer, glisse pour te promener</b> — dans la photo, pas dans la '
-         + 'page. Touche une boîte en trop pour l’enlever.<br>'
-         + 'Le bouton ✋/✏️ bascule en <b>mode dessin</b> : là, le doigt trace un cadre autour '
-         + 'd’une pièce manquée (une Plate 2 x 10 ne rentre pas dans un carré). Le pincement '
-         + 'continue de zoomer même en mode dessin, donc on cadre et on trace sans basculer.<br>'
-         + 'Mais si DEUX pièces sont dans une seule boîte, reprends la photo : c’est la seule '
-         + 'erreur que rien ne rattrape plus loin. Deux plaques collées se font reconnaître '
-         + 'comme une seule grande plaque, avec une bonne note — ni le score ni l’inventaire '
-         + 'ne peuvent le voir. Cette validation-ci porte la justesse, ce n’est pas un '
-         + 'confort.</div>';
-      h += '<div class="acts"><button class="act" data-cat-retry="1">Reprendre</button>'
-         + '<button class="act solid" data-cat-go="1">Identifier les ' + CAT.boxes.length
-         + '</button></div>';
+      h += '<div class="hint">' + CAT.boxes.length + ' pièce(s) découpée(s)'
+         + (nEdge ? ', dont ' + nEdge + ' au bord (orange)' : '') + '.</div>';
+      var nAuto = CAT.boxes.filter(function(b){ return !b.manual; }).length;
+      h += '<div class="acts">'
+         + '<button class="act" data-cat-retry="1">Reprendre</button>'
+         + (nAuto ? '<button class="act" data-cat-clear="1">Effacer les ' + nAuto
+                    + ' trouvés</button>' : '')
+         + '<button class="act solid' + (CAT.boxes.length ? '' : ' off') + '" '
+         + 'data-cat-go="1">Identifier les ' + CAT.boxes.length + '</button></div>';
     } else if(CAT.stage === 'review'){
       var groups = catGroups();
       var npc = groups.reduce(function(a, g){ return a + (g.lot ? g.qty : 0); }, 0);
@@ -3594,6 +3614,18 @@
         CAT.stage = 'idle'; CAT.boxes = []; CAT.overlay = ''; render(); }); });
     app.querySelectorAll('[data-cat-go]').forEach(function(b){
       b.addEventListener('click', catRecognise); });
+    // Effacer ce que la machine a trouvé, et GARDER ce qu'on a tracé soi-même : quand le
+    // découpage part de travers, on repart de ses propres cadres sans perdre ceux qu'on
+    // vient de poser.
+    app.querySelectorAll('[data-cat-clear]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var before = CAT.boxes.length;
+        CAT.boxes = CAT.boxes.filter(function(x){ return x.manual; });
+        CAT.overlay = catOverlay();
+        render();
+        toast((before - CAT.boxes.length) + ' cadre(s) effacé(s)'
+              + (CAT.boxes.length ? ' — les tiens restent' : ''));
+      }); });
     catWire(app);
     app.querySelectorAll('[data-cat-cancel]').forEach(function(b){
       b.addEventListener('click', function(){
