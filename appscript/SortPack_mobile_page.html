@@ -94,6 +94,41 @@
   .toast.show{ opacity:1; }
   .center{ text-align:center; color:var(--mute); padding:40px 0; }
 
+  /* ---- Cataloguage par photo ---- */
+  .cback{ background:none; border:0; color:var(--accent); font-size:13px; font-weight:650;
+          padding:0 0 10px; }
+  .ctally{ display:flex; gap:8px; margin-top:11px; }
+  .ctally div{ flex:1; background:var(--bg); border-radius:9px; padding:7px 8px; }
+  .ctally i{ display:block; font-style:normal; font-size:10.5px; color:var(--mute); }
+  .ctally b{ font-size:15px; font-weight:700; }
+  .shot{ width:100%; border-radius:11px; margin-top:11px; display:block;
+         background:var(--line); }
+  .find{ display:flex; align-items:center; gap:10px; padding:9px 0;
+         border-top:1px solid var(--line); }
+  .find > img{ width:46px; height:46px; object-fit:contain; border-radius:7px;
+               background:var(--bg); flex:none; }
+  .find .fno{ position:absolute; margin:-8px 0 0 -8px; background:var(--accent); color:#fff;
+              font-size:10px; font-weight:750; border-radius:999px; padding:1px 5px; }
+  .find .ft{ flex:1; min-width:0; font-size:13px; font-weight:600; line-height:1.3; }
+  .find .ft span{ display:block; font-weight:500; font-size:11.5px; color:var(--mute);
+                  margin-top:2px; }
+  .find.doubt{ background:rgba(217,119,6,.07); }
+  .find.absent{ background:rgba(220,38,38,.07); }
+  .find.off{ opacity:.4; }
+  .qty{ display:flex; align-items:center; gap:2px; flex:none; }
+  .qty button{ width:30px; height:30px; border-radius:8px; border:1.5px solid var(--line);
+               background:transparent; color:var(--ink); font-size:16px; font-weight:700; }
+  .qty b{ min-width:22px; text-align:center; font-size:14px; }
+  .cand{ display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+         border:0; border-top:1px solid var(--line); background:transparent;
+         color:var(--ink); padding:8px 0; }
+  .cand img{ width:34px; height:34px; object-fit:contain; flex:none; }
+  .cand .ct{ flex:1; min-width:0; font-size:12.5px; line-height:1.3; }
+  .cand .ct span{ display:block; font-size:11px; color:var(--mute); }
+  .cand.on .ct{ font-weight:700; color:var(--accent); }
+  .sc{ font-size:11px; font-weight:700; color:var(--mute); flex:none; }
+  .sc.good{ color:var(--green); } .sc.mid{ color:var(--orange); } .sc.bad{ color:#dc2626; }
+
   /* ---- tab bar ---- */
   .tabs{ position:fixed; left:0; right:0; bottom:0; z-index:10; display:flex;
          background:var(--card); border-top:1px solid var(--line);
@@ -876,11 +911,15 @@
     var fab = document.getElementById('fab');
     // L'Historique regarde ce qui est parti : on n'y saisit pas un achat, et le bouton
     // flottant passait par-dessus la derniere carte pour rien.
-    if(fab) fab.style.display = (TAB==='fin' || TAB==='hist' || PANEL.key) ? 'none' : '';
+    if(fab) fab.style.display = (TAB==='fin' || TAB==='hist' || PANEL.key || CAT.key)
+                              ? 'none' : '';
   }
 
   function render(){
     var app = document.getElementById('app');
+    // Le cataloguage par photo prend tout l'écran : dix lignes de découpes, chacune avec ses
+    // candidats, ne tiennent pas sous une carte de set.
+    if(CAT.key){ renderCat(app); return; }
     if(!SETS.length){ app.innerHTML = '<div class="center">Aucun set en cours.</div>'; return; }
     // Deux niveaux : les ENVOIS, puis les sets de celui qu'on ouvre. C'est l'envoi qui
     // part en un seul maitre et a son echelle qu'on cherche une piece — la liste plate de
@@ -894,11 +933,14 @@
       var st = statusOf(s);
       html += '<div class="card" data-key="'+esc(s.key)+'">';
       var opened = !!OPEN[s.key];
-      html += '<div class="row1'+(st.chips||s.base!=='Cataloguer' ? ' tap' : '')+'" data-toggle="1">';
+      // Un set en cataloguage n'avait rien sous sa carte, donc elle ne s'ouvrait pas. Le
+      // cataloguage par photo y met un bouton : elle s'ouvre maintenant aussi pour lui.
+      var tap = st.chips || s.base !== 'Cataloguer' || s.cat_ready;
+      html += '<div class="row1'+(tap ? ' tap' : '')+'" data-toggle="1">';
       html += '<img class="thumb" src="'+imgUrl(s.number)+'" onerror="this.style.visibility=&quot;hidden&quot;">';
       html += '<div class="name">'+esc(s.name)+'</div>';
       html += '<span class="pill '+st.cls+'">'+esc(st.label)+'</span>';
-      if(st.chips||s.base!=='Cataloguer') html += '<span class="caret">'+(opened?'⌃':'⌄')+'</span>';
+      if(tap) html += '<span class="caret">'+(opened?'⌃':'⌄')+'</span>';
       html += '</div>';
       if(st.chips && opened){
         html += '<div class="bags">';
@@ -919,6 +961,20 @@
         html += '<div class="acts"><button class="act solid" data-act="separated">'
              + 'Séparation terminée' + '</button></div>'
              + '<div class="hint">Après, le cataloguage par sac n&#39;est plus possible.</div>';
+      }
+      // Cataloguer en photo. Le bouton n'apparaît que tant qu'il reste à cataloguer — c'est
+      // la PRÉSENCE de l'inventaire publié qui le dit (`cat_ready`), et le PC ne le publie
+      // qu'au-dessus de la done-fraction : aucun seuil n'est recalculé ici. Et jamais avant
+      // que les sachets soient séparés : l'ordre physique n'est pas négociable.
+      if(opened && s.cat_ready && s.separated){
+        var cs = s.cat_session;
+        html += '<div class="acts"><button class="act solid" data-cat="1">'
+             + (cs ? 'Reprendre le sac '+esc(cs.bag)+' ('+cs.pieces+' pièces)'
+                   : 'Ajouter un sac')
+             + '</button></div>';
+        if(cs) html += '<div class="hint">'+cs.lots+' lot(s) en attente d&#39;être inscrits, '
+                     + 'sur '+cs.photos+' photo(s). Rien n&#39;est écrit tant que la liste '
+                     + 'n&#39;est pas fermée.</div>';
       }
       if(s.base !== 'Cataloguer' && opened){
         // « Appliquer restant » is gone: leftovers are placed one at a time, in the bag you
@@ -972,6 +1028,12 @@
           // de suite dans le registre partagé. Le PC enchaîne ensuite de lui-même.
           if(a === 'separated') return finishSeparating(key, btn);
           queueAction(key, a);
+        });
+      });
+      card.querySelectorAll('[data-cat]').forEach(function(btn){
+        btn.addEventListener('click', function(ev){
+          ev.stopPropagation();          // sinon la carte se referme sous l'écran qui s'ouvre
+          openCat(key, '');
         });
       });
       card.querySelectorAll('.bagx').forEach(function(btn){
@@ -1747,6 +1809,850 @@
     saveTimers[key] = setTimeout(function(){
       google.script.run.withFailureHandler(function(e){ toast('Échec sauvegarde : '+e.message); }).setBags(key, s.done);
     }, 400);
+  }
+
+  // ── Cataloguage par photo ───────────────────────────────────────────────────
+  // La boucle ne quitte jamais le téléphone : photo → découpage dans un canvas → un appel
+  // Brickognize par découpe → le candidat qui est ENCORE à l'inventaire du set. Le PC
+  // n'entre en scène qu'à « Fermer la liste », par la file de commandes. Un aller-retour
+  // par photo passerait par Drive, qui met « secondes à minutes » à propager une écriture :
+  // vingt photos par sac, et on attendrait vingt minutes au lieu de cataloguer.
+
+  // On ratisse LARGE chez Brickognize, parce que c'est l'inventaire qui filtre derrière.
+  // Mesuré sur une photo dense de 47 pièces : deux découpes n'avaient AUCUN candidat du set
+  // dans les cinq premiers, et la bonne réponse était au rang 17 (Brickognize confond
+  // obstinément 10247 avec 2476, qui n'est pas dans cette boîte). Avec top_k=5 on les
+  // perdait ; avec 20 elles sortent. Un candidat absent du set ne coûte rien — il est écarté.
+  var BKZ_URL = 'https://api.brickognize.com/predict/parts/'
+              + '?predict_color=true&top_k_items=20&top_k_colors=5'
+              + '&min_similarity_items=0.10&min_similarity_colors=0.05';
+  var BKZ_POOL = 3;            // appels en parallèle — l'API est gratuite et tenue par une
+                               // seule personne : on ne la martèle pas.
+  var SEG_W = 1100;            // largeur de travail du découpage. Les DÉCOUPES, elles, se
+                               // prennent en pleine résolution : Brickognize a besoin du détail.
+  var SEG_MIN = 0.00030;       // part de l'image sous laquelle ce n'est pas une pièce
+  var SEG_MAX = 0.25;          // au-dessus, c'est une ombre ou le fond lui-même
+  var SEG_MARGIN = 0.12;       // marge autour de chaque boîte, en fraction de son grand côté
+  var CROP_PX = 420;           // côté long de la découpe envoyée à Brickognize
+  var SURE_ITEM = 0.60, SURE_COLOR = 0.45;
+  var DEEP_RANK = 3;           // au-delà de ce rang, le repêchage est signalé : un choix pris
+                               // au rang 17 à 0,28 pendant que le candidat brut est à 0,76 est
+                               // juste assez souvent pour être gardé, et faux assez souvent
+                               // pour mériter un coup d'œil.
+
+  var CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
+             lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
+             finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false};
+
+  function openCat(key, bag){
+    var s = SETS.filter(function(x){ return x.key === key; })[0];
+    if(!s) return;
+    CAT = {key:key, number:s.number, name:s.name, bag:String(bag || ''), data:null,
+           loading:true, err:null, lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null,
+           boxes:[], overlay:'', finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false};
+    render();
+    google.script.run.withSuccessHandler(function(d){
+      if(CAT.key !== key) return;
+      CAT.loading = false;
+      if(!d || !d.ok){ CAT.err = (d && d.error) || 'inventaire indisponible'; render(); return; }
+      CAT.data = d;
+      // Une fermeture encore en vol reprend son attente : on a pu quitter la page entre le
+      // moment où on a fermé la liste et celui où le PC l'a inscrite. Une fermeture déjà
+      // terminée, elle, ne s'affiche pas — ce serait le succès d'un sac précédent.
+      if(d.cmd && (d.cmd.status === 'pending' || d.cmd.status === 'running')){
+        CAT.cmd = d.cmd; CAT.cmdId = d.cmd.id || ''; catPoll(0);
+      }
+      // Une liste déjà ouverte reprend là où elle s'était arrêtée, et c'est SON sac qui
+      // compte : le téléphone reposé au milieu d'un sachet ne doit pas en recommencer un
+      // autre sans le dire.
+      if(d.session && (d.session.lots || []).length){
+        (d.session.lots || []).forEach(function(l){ CAT.lots[l.k] = l; });
+        CAT.photos = Number(d.session.photos || 0);
+        if(d.session.bag) CAT.bag = String(d.session.bag);
+      }
+      if(!CAT.bag) CAT.bag = (d.next_bags || ['1'])[0];
+      render();
+    }).withFailureHandler(function(e){
+      if(CAT.key !== key) return;
+      CAT.loading = false; CAT.err = e.message; render();
+    }).getCatalogue(s.number);
+  }
+
+  function closeCat(){
+    if(CAT.shot && CAT.shot.bmp && CAT.shot.bmp.close) try{ CAT.shot.bmp.close(); }catch(e){}
+    CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
+           lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
+           finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false};
+    render();
+  }
+
+  function catInv(){
+    var m = {};
+    ((CAT.data && CAT.data.lots) || []).forEach(function(l){ m[l.k] = l; });
+    return m;
+  }
+
+  /** Combien de cette pièce l'inventaire tient ENCORE : ce que le PC a publié, moins ce que
+   *  la liste en cours lui a déjà pris, moins ce que les découpes de la photo en cours vont
+   *  lui prendre. `skip` exclut une découpe (la sienne, quand on règle sa quantité). */
+  function catAvail(k, skip){
+    var l = catInv()[k];
+    if(!l) return 0;
+    var used = CAT.lots[k] ? CAT.lots[k].qty : 0;
+    CAT.finds.forEach(function(f){
+      if(f === skip || f.drop || !f.pick) return;
+      if(f.pick.lot.k === k) used += f.qty;
+    });
+    return Math.max(0, Number(l.qty || 0) - used);
+  }
+
+  function catPieces(){
+    var n = 0;
+    for(var k in CAT.lots) n += CAT.lots[k].qty;
+    return n;
+  }
+
+  // ── Le découpage ────────────────────────────────────────────────────────────
+  // CONTRAT : segBoxes(rgba, w, h) -> [{x, y, w, h, area, edge}] en pixels de TRAVAIL,
+  // triées (y, x). Fonction PURE — ni DOM, ni canvas — pour qu'elle puisse se tester hors
+  // navigateur contre la version Python qui a servi à la régler.
+  //
+  // `edge` ne fait pas JETER la boîte, il la SIGNALE : ce qui touche le bord du cadre est
+  // soit le bord de la table, soit une main, soit une pièce coupée par le cadre. Dans les
+  // trois cas il faut l'œil, pas une décision automatique.
+  //
+  // CE QUI SUIT EST UN PREMIER JET, réglé sur une seule photo synthétique, et il est destiné
+  // à être remplacé par le portage de la segmentation réglée sur de VRAIES photos — fond
+  // local par grille médiane en deux passes, seuils de luminance asymétriques (une ombre ne
+  // va que vers le bas), séparation des pièces collées par dynamique de la carte de distance.
+  // La signature est déjà celle-là pour que l'échange ne touche rien d'autre.
+
+  /** Réduire la photo à la largeur de travail et rendre ses pixels. La moyenne de zone est
+   *  faite par le navigateur, qui le fait mieux et bien plus vite que nous. */
+  function catDownscale(bmp){
+    var w = Math.min(SEG_W, bmp.width), h = Math.round(bmp.height * (w / bmp.width));
+    var cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    var ctx = cv.getContext('2d');
+    ctx.drawImage(bmp, 0, 0, w, h);
+    return {rgba: ctx.getImageData(0, 0, w, h).data, w: w, h: h};
+  }
+
+  /** Le 99e centile d'un échantillon — le plus haut que le FOND atteint, grain compris. */
+  function p99(a){
+    a.sort(function(p, q){ return p - q; });
+    return a[Math.min(a.length - 1, Math.floor(a.length * 0.99))];
+  }
+
+  function segBoxes(px, W, H){
+    // La couleur du fond : la médiane des quatre bords. Une médiane et non une moyenne,
+    // pour qu'une pièce posée contre le bord ne tire pas la référence vers elle.
+    var rs = [], gs = [], bs = [], x, y, i, o;
+    function border(fn){
+      for(var xx = 0; xx < W; xx += 2){ fn((0) * W + xx); fn((H - 1) * W + xx); }
+      for(var yy = 0; yy < H; yy += 2){ fn(yy * W); fn(yy * W + W - 1); }
+    }
+    border(function(p){ o = p * 4; rs.push(px[o]); gs.push(px[o+1]); bs.push(px[o+2]); });
+    function med(a){ a.sort(function(p, q){ return p - q; }); return a[a.length >> 1]; }
+    var br = med(rs), bg = med(gs), bb = med(bs);
+
+    // Distance au fond et énergie de contour, pour chaque pixel.
+    var dist = new Uint8Array(W * H), lum = new Uint8Array(W * H);
+    for(i = 0; i < W * H; i++){
+      o = i * 4;
+      var d = Math.abs(px[o] - br) + Math.abs(px[o+1] - bg) + Math.abs(px[o+2] - bb);
+      dist[i] = d > 255 ? 255 : d;
+      lum[i] = (px[o] * 299 + px[o+1] * 587 + px[o+2] * 114) / 1000;
+    }
+    var grad = new Uint8Array(W * H);
+    for(y = 1; y < H - 1; y++) for(x = 1; x < W - 1; x++){
+      i = y * W + x;
+      var gx = Math.abs(lum[i+1] - lum[i-1]), gy = Math.abs(lum[i+W] - lum[i-W]);
+      grad[i] = Math.min(255, gx > gy ? gx : gy);
+    }
+
+    // Les deux seuils se prennent SUR LE FOND, aux bords de l'image, où il n'y a que lui.
+    //
+    // Pas d'Otsu : il suppose DEUX classes, or il y en a trois — le fond, les pièces claires
+    // et les pièces foncées — et il tranche alors entre les deux familles de pièces plutôt
+    // qu'entre le fond et elles. Mesuré sur une photo d'essai de huit pièces : la barre
+    // blanche et le bush gris clair disparaissaient tous les deux, pendant que le noir, le
+    // bleu et le rouge sortaient parfaitement. On mesure donc le BRUIT du fond (son 99e
+    // centile) et tout ce qui en sort franchement est une pièce.
+    var ds = [], gsx = [];
+    border(function(p){ ds.push(dist[p]); gsx.push(grad[p]); });
+    var thr = Math.max(22, p99(ds) * 2);
+    var gthr = Math.max(14, p99(gsx) * 2.5);
+
+    // Une pièce gris clair sur un fond gris clair ne se distingue par AUCUN seuil de
+    // couleur. Mais elle a un contour net, et le fond n'en a pas. Comme on ne cherche que
+    // des BOÎTES, le contour suffit : la composante est l'anneau, et sa boîte englobante est
+    // celle de la pièce.
+    var mask = new Uint8Array(W * H);
+    for(i = 0; i < W * H; i++) mask[i] = (dist[i] > thr || grad[i] > gthr) ? 1 : 0;
+
+    // Fermeture d'abord (dilater puis éroder) : elle scelle les trous d'un contour fin, que
+    // l'ouverture seule aurait effacé. Ouverture ensuite : le grain du fond part.
+    function dilate(src){
+      var out = new Uint8Array(W * H);
+      for(var yy = 1; yy < H - 1; yy++) for(var xx = 1; xx < W - 1; xx++){
+        var p = yy * W + xx;
+        if(src[p] || src[p-1] || src[p+1] || src[p-W] || src[p+W]) out[p] = 1;
+      }
+      return out;
+    }
+    function erode(src){
+      var out = new Uint8Array(W * H);
+      for(var yy = 1; yy < H - 1; yy++) for(var xx = 1; xx < W - 1; xx++){
+        var p = yy * W + xx;
+        out[p] = (src[p] && src[p-1] && src[p+1] && src[p-W] && src[p+W]) ? 1 : 0;
+      }
+      return out;
+    }
+    var di = dilate(erode(erode(dilate(mask))));
+
+    // Composantes connexes (pile explicite : la récursion déborderait sur 540 000 pixels).
+    var seen = new Uint8Array(W * H), stack = new Int32Array(W * H), boxes = [];
+    for(var s = 0; s < W * H; s++){
+      if(!di[s] || seen[s]) continue;
+      var top = 0, n = 0, x0 = W, y0 = H, x1 = 0, y1 = 0;
+      stack[top++] = s; seen[s] = 1;
+      while(top){
+        var p = stack[--top], pX = p % W, pY = (p - pX) / W;
+        n++;
+        if(pX < x0) x0 = pX; if(pX > x1) x1 = pX;
+        if(pY < y0) y0 = pY; if(pY > y1) y1 = pY;
+        if(pX > 0     && di[p-1] && !seen[p-1]){ seen[p-1] = 1; stack[top++] = p-1; }
+        if(pX < W - 1 && di[p+1] && !seen[p+1]){ seen[p+1] = 1; stack[top++] = p+1; }
+        if(pY > 0     && di[p-W] && !seen[p-W]){ seen[p-W] = 1; stack[top++] = p-W; }
+        if(pY < H - 1 && di[p+W] && !seen[p+W]){ seen[p+W] = 1; stack[top++] = p+W; }
+      }
+      var frac = n / (W * H);
+      if(frac < SEG_MIN || frac > SEG_MAX) continue;
+      boxes.push({x:x0, y:y0, w:x1 - x0 + 1, h:y1 - y0 + 1, area:n});
+    }
+
+    // Fusionner ce qui se chevauche OU se frôle : une pièce à deux teintes (un imprimé, un
+    // pneu sur sa jante, un axe clair à bout foncé) se casse en deux composantes séparées de
+    // quelques pixels, et l'envoyer en deux morceaux donnerait deux mauvaises réponses au
+    // lieu d'une bonne. Le jeu est petit devant l'écart entre deux pièces : la consigne est
+    // qu'elles ne se touchent pas, et deux pièces fusionnées se voient sur l'image annotée.
+    var gap = Math.max(4, Math.round(W * 0.02));
+    var merged = true;
+    while(merged){
+      merged = false;
+      for(var a = 0; a < boxes.length && !merged; a++){
+        for(var b = a + 1; b < boxes.length && !merged; b++){
+          var A = boxes[a], B = boxes[b];
+          if(A.x - gap < B.x + B.w && B.x - gap < A.x + A.w
+             && A.y - gap < B.y + B.h && B.y - gap < A.y + A.h){
+            var nx = Math.min(A.x, B.x), ny = Math.min(A.y, B.y);
+            A.w = Math.max(A.x + A.w, B.x + B.w) - nx;
+            A.h = Math.max(A.y + A.h, B.y + B.h) - ny;
+            A.x = nx; A.y = ny;
+            A.area += B.area;
+            boxes.splice(b, 1);
+            merged = true;
+          }
+        }
+      }
+    }
+
+    boxes.sort(function(p, q){ return (p.y - q.y) || (p.x - q.x); });
+    boxes.forEach(function(b){
+      b.edge = b.x <= 1 || b.y <= 1 || b.x + b.w >= W - 1 || b.y + b.h >= H - 1;
+    });
+    return boxes;
+  }
+
+  function catOverlay(){
+    var bmp = CAT.shot.bmp;
+    var W = Math.min(1000, bmp.width), k = W / bmp.width;
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = Math.round(bmp.height * k);
+    var c = cv.getContext('2d');
+    c.drawImage(bmp, 0, 0, cv.width, cv.height);
+    // Les boîtes sont en pixels de TRAVAIL : l'échelle passe par la largeur de travail, pas
+    // par celle de la photo.
+    var kx = cv.width / CAT.work.w, ky = cv.height / CAT.work.h;
+    c.lineWidth = Math.max(2, Math.round(W / 320));
+    c.font = '700 ' + Math.round(W / 26) + 'px -apple-system, system-ui, sans-serif';
+    CAT.boxes.forEach(function(b, i){
+      // Vert : trouvée. Orange : touche le bord du cadre — bord de table, main, ou pièce
+      // coupée, ça demande l'œil. Bleu : ajoutée au doigt.
+      var col = b.manual ? '#2563eb' : (b.edge ? '#d97706' : '#16a34a');
+      var x = b.x * kx, y = b.y * ky, w = b.w * kx, h = b.h * ky;
+      c.strokeStyle = col;
+      c.strokeRect(x, y, w, h);
+      var t = String(i + 1), tw = c.measureText(t).width;
+      c.fillStyle = col;
+      c.fillRect(x, Math.max(0, y - W / 22), tw + W / 48, W / 22);
+      c.fillStyle = '#fff';
+      c.fillText(t, x + W / 96, Math.max(W / 28, y - W / 180));
+    });
+    return cv.toDataURL('image/jpeg', 0.8);
+  }
+
+  /** Le doigt sur la photo annotée : enlever la boîte touchée, ou en ajouter une là.
+   *
+   *  Aucun seuil ne récupère une pièce qui est à la MÊME luminance que la table sous
+   *  l’ombre — sur la photo dense de référence il en reste deux sur 47, et baisser le seuil
+   *  en fait perdre d’autres (44, puis 43). Un geste de deux secondes vaut mieux qu’un
+   *  réglage qui dégrade le reste. Et le geste inverse sert autant : une boîte sur le bord
+   *  de la table coûte un appel et une ligne « non reconnue ».
+   */
+  function catTap(fx, fy){
+    var w = CAT.work.w, h = CAT.work.h;
+    var px = fx * w, py = fy * h;
+    for(var i = 0; i < CAT.boxes.length; i++){
+      var b = CAT.boxes[i];
+      if(px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h){
+        CAT.boxes.splice(i, 1);
+        CAT.overlay = catOverlay();
+        render();
+        toast('Boîte enlevée');
+        return;
+      }
+    }
+    var side = Math.round(w * 0.07);
+    CAT.boxes.push({x: Math.max(0, Math.min(w - side, Math.round(px - side / 2))),
+                    y: Math.max(0, Math.min(h - side, Math.round(py - side / 2))),
+                    w: side, h: side, area: side * side, edge: false, manual: true});
+    CAT.boxes.sort(function(p, q){ return (p.y - q.y) || (p.x - q.x); });
+    CAT.overlay = catOverlay();
+    render();
+    toast('Pièce ajoutée — elle partira avec les autres');
+  }
+
+  function catShot(file){
+    CAT.stage = 'working'; CAT.busy = 'Découpage…'; CAT.finds = []; render();
+    var done = function(bmp){
+      try{
+        CAT.shot = {bmp:bmp, w:bmp.width, h:bmp.height};
+        var sm = catDownscale(bmp);
+        CAT.work = {w:sm.w, h:sm.h};
+        CAT.boxes = segBoxes(sm.rgba, sm.w, sm.h);
+        if(!CAT.boxes.length){
+          CAT.stage = 'idle'; CAT.busy = '';
+          toast('Aucune pièce détectée — fond trop proche de la couleur des pièces ?');
+          render(); return;
+        }
+        CAT.overlay = catOverlay();
+        CAT.stage = 'segment'; CAT.busy = ''; render();
+      }catch(e){
+        CAT.stage = 'idle'; CAT.busy = ''; toast('Découpage impossible : ' + e.message); render();
+      }
+    };
+    // `imageOrientation` : sans ça une photo prise en portrait arrive couchée, et chaque
+    // découpe partirait tournée de 90° chez Brickognize.
+    if(window.createImageBitmap){
+      createImageBitmap(file, {imageOrientation:'from-image'}).then(done).catch(function(){
+        createImageBitmap(file).then(done).catch(function(e){
+          CAT.stage = 'idle'; toast('Photo illisible'); render();
+        });
+      });
+    } else {
+      var img = new Image();
+      img.onload = function(){ done(img); };
+      img.onerror = function(){ CAT.stage = 'idle'; toast('Photo illisible'); render(); };
+      img.src = URL.createObjectURL(file);
+    }
+  }
+
+  /** La découpe à envoyer, prise dans la PLEINE RÉSOLUTION : les boîtes sont en pixels de
+   *  travail, mais Brickognize a besoin du détail, pas de la copie réduite où l'on a
+   *  seulement cherché les pièces. On ne grossit jamais une découpe (k plafonné à 1) —
+   *  interpoler n'ajoute aucun détail et ne fait que flouter. */
+  function cropBlob(b){
+    var sx = CAT.shot.w / CAT.work.w, sy = CAT.shot.h / CAT.work.h;
+    var m = SEG_MARGIN * Math.max(b.w, b.h);
+    var x0 = Math.max(0, Math.round((b.x - m) * sx));
+    var y0 = Math.max(0, Math.round((b.y - m) * sy));
+    var x1 = Math.min(CAT.shot.w, Math.round((b.x + b.w + m) * sx));
+    var y1 = Math.min(CAT.shot.h, Math.round((b.y + b.h + m) * sy));
+    var sw = Math.max(1, x1 - x0), sh = Math.max(1, y1 - y0);
+    var cv = document.createElement('canvas');
+    var k = Math.min(1, CROP_PX / Math.max(sw, sh));
+    cv.width = Math.max(32, Math.round(sw * k));
+    cv.height = Math.max(32, Math.round(sh * k));
+    cv.getContext('2d').drawImage(CAT.shot.bmp, x0, y0, sw, sh, 0, 0, cv.width, cv.height);
+    return new Promise(function(res){
+      if(cv.toBlob) cv.toBlob(function(bl){ res({blob:bl, url:cv.toDataURL('image/jpeg', 0.6)}); },
+                              'image/jpeg', 0.88);
+      else res({blob:null, url:cv.toDataURL('image/jpeg', 0.88)});
+    });
+  }
+
+  function bkz(blob){
+    var fd = new FormData();
+    fd.append('query_image', blob, 'piece.jpg');
+    return fetch(BKZ_URL, {method:'POST', body:fd}).then(function(r){
+      if(!r.ok) throw new Error('Brickognize ' + r.status);
+      return r.json();
+    });
+  }
+
+  /** Le candidat retenu est le mieux noté qui est ENCORE à l'inventaire du set.
+   *
+   *  C'est tout l'intérêt : le candidat n°1 brut confond le noir et le gris foncé, le blanc
+   *  et le gris clair. Mais on sait ce que la boîte contient, donc on ne choisit que
+   *  là-dedans. Et quand une pièce n'y est que dans UNE couleur, la prédiction de couleur
+   *  ne sert plus à rien : s'y fier ne pourrait que faire rater la pièce. */
+  function catMatch(res, inv){
+    var items = (res && res.items) || [], cols = (res && res.colors) || [], pairs = [];
+    items.forEach(function(it, rank){
+      if(it.type !== 'part' && it.type !== 'sticker') return;
+      var mine = [];
+      for(var k in inv){
+        if(String(inv[k].id) === String(it.id) && catAvail(k) > 0) mine.push(inv[k]);
+      }
+      if(!mine.length) return;
+      if(mine.length === 1){
+        pairs.push({lot:mine[0], si:it.score, cs:1, deduced:true, item:it,
+                    rank:rank, crank:0});
+        return;
+      }
+      var hit = false;
+      cols.forEach(function(c, cr){
+        mine.forEach(function(l){
+          if(String(l.color) === String(c.id)){
+            pairs.push({lot:l, si:it.score, cs:c.score, item:it, rank:rank, crank:cr});
+            hit = true;
+          }
+        });
+      });
+      // La pièce est au set, mais dans aucune des couleurs prédites : on la propose quand
+      // même, en bas de liste. La déclarer absente ferait recommencer une photo qui est bonne.
+      if(!hit) mine.forEach(function(l){
+        pairs.push({lot:l, si:it.score, cs:0.12, item:it, rank:rank, crank:cols.length});
+      });
+    });
+    pairs.forEach(function(p){
+      p.score = p.si * (0.35 + 0.65 * p.cs);
+      // « Repêchée » : le choix n'est pas le candidat brut de Brickognize, c'est l'inventaire
+      // du set qui l'a remonté. Un repêchage PROFOND (rang 17 à 0,28 pendant que le brut est
+      // à 0,76) est juste assez souvent pour être gardé, et faux assez souvent pour mériter
+      // un coup d'œil — donc il se dit, il ne se cache pas.
+      p.rescued = (p.rank > 0 || p.crank > 0);
+      p.deep = (p.rank + 1) > DEEP_RANK;
+    });
+    pairs.sort(function(a, b){ return b.score - a.score; });
+    return pairs.slice(0, 8);
+  }
+
+  function findStatus(f){
+    if(!f.pick) return 'absent';
+    var p = f.pick;
+    // Un repêchage profond ou une découpe qui touche le bord passent en « à vérifier » même
+    // si la note est bonne : ce sont précisément les cas où la note ne dit rien de juste.
+    if(p.deep || f.edge) return 'doubt';
+    return (p.si >= SURE_ITEM && (p.deduced || p.cs >= SURE_COLOR)) ? 'ok' : 'doubt';
+  }
+
+  function catRecognise(){
+    CAT.stage = 'working';
+    var boxes = CAT.boxes, out = new Array(boxes.length), next = 0, live = 0, ended = 0;
+    CAT.busy = 'Reconnaissance 0/' + boxes.length; render();
+    function pump(){
+      while(live < BKZ_POOL && next < boxes.length){
+        live++;
+        (function(i){
+          cropBlob(boxes[i]).then(function(c){
+            out[i] = {crop:c.url};
+            if(!c.blob) throw new Error('découpe illisible');
+            return bkz(c.blob);
+          }).then(function(r){
+            out[i].res = r;
+          }).catch(function(e){
+            out[i] = out[i] || {};
+            out[i].err = e.message;
+          }).then(function(){
+            live--; ended++;
+            CAT.busy = 'Reconnaissance ' + ended + '/' + boxes.length;
+            if(ended === boxes.length) finish(); else { render(); pump(); }
+          });
+        })(next++);
+      }
+    }
+    function finish(){
+      // On apparie DANS L'ORDRE des découpes, pas dans l'ordre des réponses : la quantité
+      // encore disponible dépend de ce que les découpes précédentes ont déjà réservé, donc
+      // un ordre qui change d'une fois à l'autre donnerait un résultat qui change aussi.
+      var inv = catInv();
+      CAT.finds = [];
+      out.forEach(function(o, i){
+        o = o || {};
+        var pairs = o.res ? catMatch(o.res, inv) : [];
+        var f = {i:i + 1, crop:o.crop || '', err:o.err || '', pairs:pairs,
+                 pick:pairs[0] || null, qty:1, drop:false,
+                 edge: !!(boxes[i] && boxes[i].edge)};
+        CAT.finds.push(f);
+      });
+      CAT.stage = 'review'; CAT.busy = ''; CAT.open = null; render();
+    }
+    pump();
+  }
+
+  function catAddFinds(){
+    var n = 0, pieces = 0;
+    CAT.finds.forEach(function(f){
+      if(f.drop || !f.pick || f.qty <= 0) return;
+      var l = f.pick.lot, k = l.k;
+      if(CAT.lots[k]) CAT.lots[k].qty += f.qty;
+      else CAT.lots[k] = {k:k, id:l.id, color:l.color, name:l.name, color_name:l.color_name,
+                          qty:f.qty, score:Math.round((f.pick.score || 0) * 100) / 100};
+      n++; pieces += f.qty;
+    });
+    var absent = CAT.finds.filter(function(f){ return !f.drop && !f.pick; }).length;
+    if(!n){ toast('Rien à ajouter'); return; }
+    CAT.photos++;
+    CAT.finds = []; CAT.boxes = []; CAT.overlay = ''; CAT.stage = 'idle';
+    catSave(function(){
+      toast(pieces + ' pièce(s) ajoutée(s) au sac ' + CAT.bag
+            + (absent ? ' — ' + absent + ' non reconnue(s), à faire à la main' : ''));
+    });
+  }
+
+  /** Enregistrer la liste après chaque photo. C'est le seul filet : le `localStorage` vit
+   *  sur le sous-domaine d'Apps Script, qui tourne, et une heure de saisie partirait avec. */
+  function catSave(then){
+    CAT.saving = true; render();
+    var lots = [];
+    for(var k in CAT.lots) lots.push(CAT.lots[k]);
+    google.script.run.withSuccessHandler(function(r){
+      CAT.saving = false;
+      if(!r || !r.ok) toast('⚠ liste non enregistrée : ' + ((r && r.error) || '?'));
+      render();
+      if(then) then();
+    }).withFailureHandler(function(e){
+      CAT.saving = false; toast('⚠ liste non enregistrée : ' + e.message); render();
+    }).saveCatSession(CAT.number, CAT.bag, lots, CAT.photos);
+  }
+
+  function catClose(){
+    var pieces = catPieces();
+    if(!pieces){ toast('La liste est vide'); return; }
+    if(!confirm('Fermer le sac ' + CAT.bag + ' avec ' + pieces + ' pièce(s) ?\n\n'
+              + 'Le PC écrit la liste et les sort de l’inventaire.')) return;
+    CAT.saving = true; render();
+    google.script.run.withSuccessHandler(function(r){
+      CAT.saving = false;
+      if(!r || !r.ok){ toast((r && r.error) || 'refusé'); render(); return; }
+      CAT.cmdId = r.id || '';
+      CAT.cmd = {id:CAT.cmdId, status:'pending', result:'', bag:CAT.bag};
+      render();
+      catPoll(0);
+    }).withFailureHandler(function(e){
+      CAT.saving = false; toast('Erreur : ' + e.message); render();
+    }).closeCatBag(CAT.key, CAT.number, CAT.bag);
+  }
+
+  var catTimer = null;
+  function catPoll(tries){
+    clearTimeout(catTimer);
+    if(tries > 20){          // ~3 min : le PC ne tourne probablement pas
+      CAT.cmd = {status:'error', result:'toujours en attente — le PC ne tourne peut-être pas.'};
+      render(); return;
+    }
+    catTimer = setTimeout(function(){
+      google.script.run.withSuccessHandler(function(d){
+        if(!CAT.key) return;
+        var c = d && d.cmd;
+        if(c && c.id === CAT.cmdId && (c.status === 'done' || c.status === 'error')){
+          CAT.cmd = c;
+          if(c.status === 'done'){
+            // Le sac est écrit et l'inventaire décrémenté : la liste en cours n'existe plus,
+            // et l'instantané qu'on vient de relire est celui d'APRÈS.
+            CAT.lots = {}; CAT.photos = 0;
+            if(d.ok){ CAT.data = d; CAT.bag = (d.next_bags || ['1'])[0]; }
+            load(true);                    // la carte du set doit suivre (pastille, sacs)
+          }
+          render(); return;
+        }
+        catPoll(tries + 1);
+      }).withFailureHandler(function(){ catPoll(tries + 1); }).getCatalogue(CAT.number);
+    }, 8000);
+  }
+
+  // ── L'écran ─────────────────────────────────────────────────────────────────
+
+  function catFindHtml(f){
+    var st = findStatus(f);
+    var h = '<div class="find ' + (f.drop ? 'off' : st) + '">';
+    h += '<span class="fno">' + f.i + '</span>';
+    h += f.crop ? '<img src="' + f.crop + '">' : '<img>';
+    if(f.pick){
+      var l = f.pick.lot, pc = Math.round(f.pick.si * 100);
+      var cls = f.pick.si >= SURE_ITEM ? 'good' : (f.pick.si >= 0.4 ? 'mid' : 'bad');
+      var note = [];
+      if(f.pick.deduced) note.push('couleur déduite');
+      if(f.pick.manual) note.push('choisie à la main');
+      else if(f.pick.rescued) note.push('repêchée au rang ' + (f.pick.rank + 1)
+                                        + '/' + (f.pick.crank + 1));
+      if(f.edge) note.push('⚠ touche le bord');
+      h += '<button class="ft" data-cand="' + f.i + '">' + esc(l.name || l.id)
+         + '<span>' + esc(l.color_name || ('couleur ' + l.color)) + ' · ' + esc(l.id)
+         + (note.length ? ' · ' + esc(note.join(' · ')) : '') + '</span></button>';
+      h += '<span class="sc ' + cls + '">' + pc + '%</span>';
+      h += '<span class="qty"><button data-less="' + f.i + '">−</button><b>' + f.qty
+         + '</b><button data-more="' + f.i + '">+</button></span>';
+    } else {
+      h += '<button class="ft" data-cand="' + f.i + '">Non reconnue'
+         + '<span>' + esc(f.err || 'aucun candidat n’est encore à l’inventaire')
+         + ' — choisis-la à la main</span></button>';
+    }
+    h += '<button class="qty" data-drop="' + f.i + '" style="border:0;background:none;'
+       + 'color:var(--mute);font-size:17px;padding:0 2px">'
+       + (f.drop ? '↺' : '✕') + '</button>';
+    h += '</div>';
+    if(CAT.open === f.i){
+      (f.pairs || []).forEach(function(p, i){
+        var on = (f.pick === p);
+        h += '<button class="cand' + (on ? ' on' : '') + '" data-pick="' + f.i + ':' + i + '">'
+           + '<img src="' + partImg({type:p.lot.type, color_id:p.lot.color, id:p.lot.id})
+           + '" onerror="this.style.visibility=&quot;hidden&quot;">'
+           + '<span class="ct">' + esc(p.lot.name || p.lot.id)
+           + '<span>' + esc(p.lot.color_name || '') + ' · reste ' + catAvail(p.lot.k, f)
+           + (p.deduced ? ' · seule couleur au set' : '') + '</span></span>'
+           + '<span class="sc">' + Math.round(p.si * 100) + '/'
+           + Math.round(p.cs * 100) + '</span></button>';
+      });
+      h += '<input class="ebar" id="catq" placeholder="…ou cherche dans l’inventaire" '
+         + 'value="' + esc(CAT.q) + '">';
+      if(CAT.q.trim()){
+        var q = fold(CAT.q.trim()), inv = catInv(), hits = [];
+        for(var k in inv){
+          var l = inv[k];
+          if(catAvail(k, f) <= 0) continue;
+          if(fold(l.name + ' ' + l.id + ' ' + l.color_name).indexOf(q) >= 0) hits.push(l);
+        }
+        hits.slice(0, 12).forEach(function(l){
+          h += '<button class="cand" data-manual="' + f.i + ':' + esc(l.k) + '">'
+             + '<img src="' + partImg({type:l.type, color_id:l.color, id:l.id})
+             + '" onerror="this.style.visibility=&quot;hidden&quot;">'
+             + '<span class="ct">' + esc(l.name || l.id) + '<span>'
+             + esc(l.color_name || '') + ' · reste ' + catAvail(l.k, f)
+             + '</span></span></button>';
+        });
+        if(!hits.length) h += '<div class="hint">Rien de tel dans ce qui reste à cataloguer.</div>';
+      }
+    }
+    return h;
+  }
+
+  function renderCat(app){
+    var h = '<button class="cback" data-cat-back="1">‹ Retour</button>';
+    h += '<div class="card">';
+    h += '<div class="row1"><img class="thumb" src="' + imgUrl(CAT.number)
+       + '" onerror="this.style.visibility=&quot;hidden&quot;">'
+       + '<div class="name">' + esc(CAT.name) + '<span class="hint2">Cataloguage par photo'
+       + (CAT.bag ? ' — sac ' + esc(CAT.bag) : '') + '</span></div></div>';
+
+    if(CAT.loading){ h += '<div class="center">Chargement&#8230;</div></div>'; app.innerHTML = h; return; }
+    if(CAT.err){ h += '<div class="rep bad">' + esc(CAT.err) + '</div></div>'; app.innerHTML = h; wireCat(app); return; }
+
+    var d = CAT.data || {};
+    h += '<div class="ctally">'
+       + '<div><i>Au sac</i><b>' + catPieces() + '</b></div>'
+       + '<div><i>Photos</i><b>' + CAT.photos + '</b></div>'
+       + '<div><i>Reste au set</i><b>' + ((d.inv_qty || 0) - catPieces()) + '</b></div>'
+       + '</div>';
+
+    // Le choix du sac : la suite du sachet en cours, ou le suivant. Rien dans les fichiers
+    // ne dit lequel — ça dépend d'un fait physique, donc c'est à nous de trancher.
+    if(!catPieces() && CAT.stage === 'idle'){
+      h += '<div class="frow">';
+      (d.next_bags || []).concat(d.bags || []).forEach(function(b){
+        h += '<button class="fchip' + (CAT.bag === b ? ' on' : '') + '" data-bag="' + esc(b) + '">'
+           + esc(b) + '</button>';
+      });
+      h += '</div>';
+      if((d.bags || []).indexOf(CAT.bag) >= 0){
+        h += '<div class="hint">Le sac ' + esc(CAT.bag) + ' existe déjà : les pièces s&#39;y '
+           + 'ajouteront.</div>';
+      }
+    }
+
+    if(CAT.stage === 'working'){
+      h += '<div class="rep">' + esc(CAT.busy || '…') + '</div>';
+    } else if(CAT.stage === 'segment'){
+      var nEdge = CAT.boxes.filter(function(b){ return b.edge; }).length;
+      h += '<img class="shot" id="catshot" src="' + CAT.overlay + '">';
+      h += '<div class="hint"><b>' + CAT.boxes.length + ' pièce(s) découpée(s)'
+         + (nEdge ? ', dont ' + nEdge + ' au bord du cadre (orange)' : '') + '.</b><br>'
+         + 'Une pièce manquée ? <b>Touche-la sur la photo.</b> Une boîte en trop (le bord de '
+         + 'la table, ta main) ? <b>Touche-la pour l’enlever.</b><br>'
+         + 'Mais si DEUX pièces sont dans une seule boîte, reprends la photo : c’est la seule '
+         + 'erreur que rien ne rattrape plus loin. Deux plaques collées se font reconnaître '
+         + 'comme une seule grande plaque, avec une bonne note — ni le score ni l’inventaire '
+         + 'ne peuvent le voir. Cette validation-ci porte la justesse, ce n’est pas un '
+         + 'confort.</div>';
+      h += '<div class="acts"><button class="act" data-cat-retry="1">Reprendre</button>'
+         + '<button class="act solid" data-cat-go="1">Identifier les ' + CAT.boxes.length
+         + '</button></div>';
+    } else if(CAT.stage === 'review'){
+      var keep = CAT.finds.filter(function(f){ return !f.drop && f.pick; });
+      var npc = keep.reduce(function(a, f){ return a + f.qty; }, 0);
+      var doubt = keep.filter(function(f){ return findStatus(f) === 'doubt'; }).length;
+      var abs = CAT.finds.filter(function(f){ return !f.drop && !f.pick; }).length;
+      h += '<div class="hint">' + npc + ' pièce(s) reconnue(s)'
+         + (doubt ? ' · ' + doubt + ' à vérifier' : '')
+         + (abs ? ' · ' + abs + ' non reconnue(s)' : '')
+         + '. Touche une ligne pour voir les autres candidats.</div>';
+      CAT.finds.forEach(function(f){ h += catFindHtml(f); });
+      h += '<div class="acts"><button class="act" data-cat-cancel="1">Annuler la photo</button>'
+         + '<button class="act solid' + (npc ? '' : ' off') + '" data-cat-add="1">'
+         + 'Ajouter au sac</button></div>';
+    } else {
+      h += '<input type="file" id="catfile" accept="image/*" capture="environment" '
+         + 'style="position:absolute;width:0;height:0;opacity:0">';
+      h += '<div class="acts"><label class="act solid" for="catfile" '
+         + 'style="text-align:center">📷 Prendre une photo</label></div>';
+      h += '<div class="hint">Une dizaine de pièces, bien séparées, sur un fond uni qui '
+         + 'contraste. Elles ne doivent pas se toucher.</div>';
+    }
+
+    if(CAT.stage === 'idle' && catPieces()){
+      h += '<div class="acts"><button class="act" data-cat-drop="1">Jeter la liste</button>'
+         + '<button class="act solid" data-cat-close="1">Fermer la liste</button></div>';
+      if(CAT.saving) h += '<div class="rep">Enregistrement…</div>';
+    }
+    if(CAT.cmd){
+      var ic = {pending:'⏳', running:'⚙', done:'✓', error:'⚠'}[CAT.cmd.status] || '';
+      h += '<div class="cmd ' + CAT.cmd.status + '">' + ic + ' Fermeture du sac '
+         + esc(CAT.cmd.bag || '') + ' — ' + esc(CAT.cmd.result || CAT.cmd.status) + '</div>';
+    }
+    h += '</div>';
+
+    // Ce que la liste contient déjà, le dernier ajouté en premier.
+    var ks = Object.keys(CAT.lots);
+    if(ks.length){
+      h += '<div class="card"><b style="font-size:14px">Sac ' + esc(CAT.bag) + ' — '
+         + ks.length + ' lot(s)</b>';
+      ks.reverse().forEach(function(k){
+        var l = CAT.lots[k];
+        h += '<div class="find"><img src="'
+           + partImg({type:l.type || 'P', color_id:l.color, id:l.id})
+           + '" onerror="this.style.visibility=&quot;hidden&quot;">'
+           + '<div class="ft">' + esc(l.name || l.id) + '<span>' + esc(l.color_name || '')
+           + ' · ' + esc(l.id) + '</span></div>'
+           + '<span class="qty"><button data-lless="' + esc(k) + '">−</button><b>' + l.qty
+           + '</b><button data-lmore="' + esc(k) + '">+</button></span></div>';
+      });
+      h += '</div>';
+    }
+    app.innerHTML = h;
+    wireCat(app);
+  }
+
+  function wireCat(app){
+    function find(i){ return CAT.finds.filter(function(f){ return f.i === Number(i); })[0]; }
+    var f = app.querySelector('#catfile');
+    if(f) f.addEventListener('change', function(){
+      if(f.files && f.files[0]) catShot(f.files[0]);
+      f.value = '';
+    });
+    app.querySelectorAll('[data-cat-back]').forEach(function(b){
+      b.addEventListener('click', closeCat); });
+    app.querySelectorAll('[data-cat-retry]').forEach(function(b){
+      b.addEventListener('click', function(){
+        CAT.stage = 'idle'; CAT.boxes = []; CAT.overlay = ''; render(); }); });
+    app.querySelectorAll('[data-cat-go]').forEach(function(b){
+      b.addEventListener('click', catRecognise); });
+    var shot = app.querySelector('#catshot');
+    if(shot) shot.addEventListener('click', function(ev){
+      var r = shot.getBoundingClientRect();
+      if(!r.width || !r.height) return;
+      var fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+      if(fx < 0 || fx > 1 || fy < 0 || fy > 1) return;
+      catTap(fx, fy);
+    });
+    app.querySelectorAll('[data-cat-cancel]').forEach(function(b){
+      b.addEventListener('click', function(){
+        CAT.stage = 'idle'; CAT.finds = []; CAT.boxes = []; CAT.overlay = ''; render(); }); });
+    app.querySelectorAll('[data-cat-add]').forEach(function(b){
+      b.addEventListener('click', catAddFinds); });
+    app.querySelectorAll('[data-cat-close]').forEach(function(b){
+      b.addEventListener('click', catClose); });
+    app.querySelectorAll('[data-cat-drop]').forEach(function(b){
+      b.addEventListener('click', function(){
+        if(!confirm('Jeter la liste du sac ' + CAT.bag + ' ? Aucun fichier n’a été '
+                  + 'touché — rien n’est encore inscrit.')) return;
+        CAT.lots = {}; CAT.photos = 0;
+        google.script.run.withSuccessHandler(function(){ render(); }).dropCatSession(CAT.number);
+        render();
+      }); });
+    app.querySelectorAll('[data-bag]').forEach(function(b){
+      b.addEventListener('click', function(){
+        CAT.bag = b.getAttribute('data-bag'); render(); }); });
+    app.querySelectorAll('[data-cand]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var i = Number(b.getAttribute('data-cand'));
+        CAT.open = (CAT.open === i) ? null : i;
+        CAT.q = '';
+        render();
+      }); });
+    app.querySelectorAll('[data-pick]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var p = b.getAttribute('data-pick').split(':'), ff = find(p[0]);
+        if(!ff) return;
+        ff.pick = ff.pairs[Number(p[1])];
+        ff.qty = Math.min(ff.qty, Math.max(1, catAvail(ff.pick.lot.k, ff)));
+        CAT.open = null; render();
+      }); });
+    app.querySelectorAll('[data-manual]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var v = b.getAttribute('data-manual'), i = v.slice(0, v.indexOf(':'));
+        var k = v.slice(v.indexOf(':') + 1), ff = find(i), l = catInv()[k];
+        if(!ff || !l) return;
+        // Choisie à la main : la note n'a plus de sens, et la donner à 100 % laisserait
+        // croire que la machine avait trouvé.
+        ff.pairs = [{lot:l, si:1, cs:1, manual:true, score:1}].concat(ff.pairs || []);
+        ff.pick = ff.pairs[0];
+        ff.qty = 1;
+        CAT.open = null; CAT.q = ''; render();
+      }); });
+    app.querySelectorAll('[data-more]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var ff = find(b.getAttribute('data-more'));
+        if(ff && ff.pick && catAvail(ff.pick.lot.k, ff) > ff.qty){ ff.qty++; render(); }
+        else toast('L’inventaire n’en tient pas plus');
+      }); });
+    app.querySelectorAll('[data-less]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var ff = find(b.getAttribute('data-less'));
+        if(ff && ff.qty > 1){ ff.qty--; render(); }
+      }); });
+    app.querySelectorAll('[data-drop]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var ff = find(b.getAttribute('data-drop'));
+        if(ff){ ff.drop = !ff.drop; render(); }
+      }); });
+    app.querySelectorAll('[data-lmore]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var k = b.getAttribute('data-lmore');
+        if(catAvail(k) <= 0) return toast('L’inventaire n’en tient pas plus');
+        CAT.lots[k].qty++; catSave();
+      }); });
+    app.querySelectorAll('[data-lless]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var k = b.getAttribute('data-lless');
+        if(!CAT.lots[k]) return;
+        CAT.lots[k].qty--;
+        if(CAT.lots[k].qty <= 0) delete CAT.lots[k];
+        catSave();
+      }); });
+    var q = app.querySelector('#catq');
+    if(q) q.addEventListener('input', function(){
+      CAT.q = q.value;
+      clearTimeout(q._t);
+      q._t = setTimeout(function(){
+        var at = q.selectionStart;
+        render();
+        var nq = document.getElementById('catq');
+        if(nq){ nq.focus(); try{ nq.setSelectionRange(at, at); }catch(e){} }
+      }, 250);
+    });
   }
 
   function load(quiet){

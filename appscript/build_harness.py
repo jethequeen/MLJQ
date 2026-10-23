@@ -18,11 +18,15 @@ OUT = "G:/Mon Disque/MLJQ - Sort and Pack Helper/_cfb_debug/phone_harness.html"
 
 
 def rj(name, default=None):
-    try:
-        with io.open(os.path.join(CFB, name), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return default
+    """Lire un JSON d'etat. Meme regle que config.state_path et stateFolder_ dans le .gs :
+    on regarde dans _app, puis a la racine pour les fichiers qui n'ont pas encore bascule."""
+    for base in (os.path.join(CFB, "_app"), CFB):
+        try:
+            with io.open(os.path.join(base, name), encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            continue
+    return default
 
 
 # --- getSets(), tel que le .gs le construit ---------------------------------
@@ -50,6 +54,9 @@ for s in idx.get("sets", []):
         "sorting": (e.get("status") == "Trier") or len(done) > 0,
         "has_inventory": True if s.get("has_inventory") is None else bool(s.get("has_inventory")),
         "restants_done": bool(s.get("restants_done")),
+        # Cataloguage par photo : pret des que le PC publie l'inventaire du set.
+        "cat_ready": bool(s.get("cataloguing")) and (
+            s.get("has_inventory") is None or bool(s.get("has_inventory"))),
     }
     c = latest.get(s["key"])
     if c:
@@ -95,7 +102,23 @@ for s in sets:
         d["cmds"] = {}
         restants[str(num)] = d
 
-harness = {"generated": idx.get("generated") or "", "sets": sets, "batches": batches,
+# --- getCatalogue() : l'inventaire publie par le PC + la liste ouverte ------
+catalogues, csess = {}, rj("catsessions.json", {}) or {}
+for s_ in sets:
+    d = rj("catalogue_%s.json" % s_["number"])
+    if d is None:
+        continue
+    d["ok"] = True
+    d["session"] = csess.get(str(s_["number"]))
+    d["cmd"] = None
+    catalogues[str(s_["number"])] = d
+    cs = csess.get(str(s_["number"]))
+    if cs:
+        s_["cat_session"] = {"bag": cs.get("bag") or "", "lots": len(cs.get("lots") or []),
+                             "pieces": int(cs.get("pieces") or 0),
+                             "photos": int(cs.get("photos") or 0)}
+
+harness = {"catalogues": catalogues, "generated": idx.get("generated") or "", "sets": sets, "batches": batches,
            "restants": restants, "dash": rj("dashboard.json", {}) or {}}
 
 PRELUDE = """
@@ -130,6 +153,17 @@ window.addEventListener('error', function(e){
       reply.call(api, {ok:true, id:'stub', status:'pending'});
     };
     api.logPurchase = function(){ reply.call(api, {ok:true}); };
+    api.getCatalogue = function(n){ reply.call(api,
+      HARNESS.catalogues[String(n)] || {ok:false, error:"pas d'inventaire pour " + n}, 60); };
+    api.saveCatSession = function(n, bag, lots){
+      window.__ERRORS__.push('[saveCatSession] sac ' + bag + ' : ' + lots.length + ' lot(s)');
+      reply.call(api, {ok:true, lots:lots.length});
+    };
+    api.dropCatSession = function(){ reply.call(api, {ok:true}); };
+    api.closeCatBag = function(k, n, bag){
+      window.__ERRORS__.push('[closeCatBag] set ' + n + ' sac ' + bag);
+      reply.call(api, {ok:true, id:'stub', status:'pending'});
+    };
     return api;
   }
   window.google = { script: { get run(){ return maker(); } } };
@@ -139,6 +173,17 @@ window.addEventListener('error', function(e){
 
 page = io.open(PAGE, encoding="utf-8").read()
 prelude = PRELUDE.replace("__DATA__", json.dumps(harness, ensure_ascii=False))
+
+# Une photo d'essai embarquee (--photo <fichier>) : depuis un file://, la page ne peut pas
+# aller chercher une image a cote, mais elle peut lire une data: URL. Avec elle, le
+# decoupage se teste a la console sans toucher a un telephone :
+#     fetch(__TEST_PHOTO__).then(r => r.blob()).then(catShot)
+if "--photo" in sys.argv:
+    import base64
+    src = sys.argv[sys.argv.index("--photo") + 1]
+    b64 = base64.b64encode(io.open(src, "rb").read()).decode()
+    prelude += ("<script>window.__TEST_PHOTO__ = 'data:image/jpeg;base64," + b64
+                + "';</script>")
 
 # juste avant le <script> principal de la page
 m = list(re.finditer(r"<script>", page))

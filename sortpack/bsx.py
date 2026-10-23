@@ -335,6 +335,26 @@ def append_lots(path, lots, out_path=None):
     return len(lots)
 
 
+def new_document(path, currency="CAD", gui_state=None):
+    """Write an EMPTY BrickStore document, ready for `append_lots`.
+
+    That is how a numbered bag is born when the cataloguing comes from the phone's photo
+    pass (sortpack/photocat.py): the lots are then appended one by one, each carrying the
+    category and name of the inventory lot it came out of — which `write_inventory` cannot
+    do, since it rebuilds every block from a catalog Part. The GuiState is the bags' own
+    layout (config.BSX_GUI_STATE), so the file opens in BrickStore with the right columns.
+    """
+    block = gui_state if gui_state is not None else getattr(config, "BSX_GUI_STATE", "")
+    out = ['<?xml version="1.0" encoding="UTF-8"?>', "<BrickStoreXML>",
+           f' <Inventory Currency="{escape(str(currency))}">', " </Inventory>"]
+    if block:
+        out.append(block)
+    out.append("</BrickStoreXML>")
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(out) + "\n")
+    return path
+
+
 def write_inventory(path, parts, gui_state=None, currency="CAD"):
     """Write a fresh BrickStore inventory .bsx for a whole set from catalog `parts` (each
     with item_type, item_id, color_id, color_name, qty, and optionally item_name). Every

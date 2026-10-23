@@ -504,7 +504,8 @@ Les trois fichiers sont en **ASCII sans accents** : `cmd.exe` lit les `.bat` en 
 OEM, `wscript` lit les `.vbs` en ANSI, et PowerShell 5.1 lit un `.ps1` sans BOM en ANSI. Un
 seul caractère accentué suffit à casser l'analyse du script entier — c'est arrivé au premier
 jet. Le `.bat` fixe en revanche `PYTHONIOENCODING=utf-8` pour que le journal garde ses
-accents ; il se relit avec `Get-Content reportsemote.log -Encoding UTF8`.
+accents ; il se relit avec `Get-Content reports
+emote.log -Encoding UTF8`.
 
 ## Ce qu'il y a dans `BSX\CFB`, et pourquoi
 
@@ -1565,6 +1566,186 @@ started** (`restants_done` → *never renumber the Sacs*), so a set can reach th
 never been through another Apply. Whatever the check does is reported back to the GUI log and
 to the phone's result line, not just written to a log nobody reads: the master is already gone
 by the time you would look.
+
+## Cataloguer en photo, depuis le téléphone
+
+Cataloguer à la main veut dire saisir chaque lot dans BrickStore : décrémenter
+l'`Inventory*.bsx` et incrémenter un sac numéroté, des heures par boîte. Le téléphone le
+fait à partir d'une **photo** : une dizaine de pièces étalées sur un fond uni, et la liste
+se remplit toute seule.
+
+```
+Tri → un envoi → une carte de set en cataloguage → « Ajouter un sac »
+   photo (une dizaine de pièces, bien séparées)
+   → découpage, montré sur l'image annotée : on valide ou on reprend
+   → un appel Brickognize par découpe
+   → le candidat qui est ENCORE à l'inventaire du set
+   → on corrige ce qui est douteux, « Ajouter au sac »
+   … on recommence jusqu'à ce que le sachet soit vide …
+   → « Fermer la liste » → le PC écrit le .bsx et décrémente l'inventaire
+```
+
+### Ce qui rend la reconnaissance fiable : l'inventaire du set
+
+Brickognize rend une liste de candidats avec leur note, et le premier se trompe
+régulièrement — le noir et le gris foncé, le blanc et le gris clair se ressemblent en photo.
+Mais **on sait ce que la boîte contient**. Parmi les candidats, on ne retient donc que ceux
+qui sont encore à l'inventaire du set, dans la bonne couleur et en quantité suffisante.
+
+Et quand une pièce n'est au set que dans **une** couleur, la prédiction de couleur ne sert
+plus à rien : s'y fier ne pourrait que faire rater la pièce. L'app affiche alors
+*couleur déduite*.
+
+Mesuré sur une photo d'essai de huit pièces du 42226 (fond gris clair, pièces Technic
+minuscules) : **8 sur 8 justes, pièce et couleur**, dont six par couleur déduite ; les deux
+`3713` (Technic Bush) se sont départagés par la vraie prédiction de couleur — Red 0,78 et
+Light Bluish Gray 0,68. Une seule a été marquée « à vérifier », la barre blanche, notée 0,55.
+
+Les ids de Brickognize sont ceux de **BrickLink** (`3001`, couleur `5` = Red), donc rien à
+convertir : c'est déjà ce que `<ItemID>` et `<ColorID>` attendent dans un `.bsx`.
+
+### Le découpage — mesuré, et en cours de remplacement
+
+**Ce que la page contient aujourd'hui est un premier jet, et il ne tient pas sur de vraies
+photos.** Mesuré sur les six photos de l'atelier, contre la vérité terrain :
+
+| photo | trouvées | réelles |
+|---|---|---|
+| dense | 3 | 47 |
+| gros plan 1 | 2 | 12 |
+| gros plan 2 | 3 | 7 |
+| gros plan 3 | 2 | 11 |
+| gros plan 4 | 9 | 10 |
+| gros plan 5 | 4 | 10 |
+
+La cause est nette : il estime **un seul** fond pour toute l'image, pris sur ses bords. La
+table de l'atelier est grise, l'éclairage la traverse en biais et une ombre portée mange la
+moitié du cadre — un fond unique y est faux partout ailleurs. Ce qui suit décrit donc une
+approche qui marche sur une photo synthétique et pas dans la vraie vie ; elle est remplacée
+par un fond **local** (grille médiane en deux passes), des seuils de luminance asymétriques
+(une ombre ne va que vers le bas) et une séparation des pièces collées par dynamique de la
+carte de distance. Le contrat d'interface est déjà en place — `segBoxes(rgba, w, h)` rendant
+des boîtes en pixels de travail — pour que l'échange ne touche rien d'autre.
+
+### Le premier jet : la distance au fond, et pourquoi il n'y a pas d'Otsu dedans
+
+Le découpage tourne **dans la page**, en canvas, sans dépendance : OpenCV.js pèse huit
+mégaoctets pour ce que trente lignes font sur des pièces bien séparées.
+
+On ne seuille pas le gris — un fond blanc avec des pièces blanches ET noires casse n'importe
+quel seuil de luminosité. On mesure la **distance à la couleur du fond**, prise sur les bords
+de l'image où il n'y a que lui.
+
+Le seuil, lui, ne se décide **pas par Otsu**, et ça s'est payé une première version :
+Otsu suppose DEUX classes, or il y en a trois — le fond, les pièces claires, les pièces
+foncées — et il tranche alors *entre les deux familles de pièces* plutôt qu'entre le fond et
+elles. Sur la photo d'essai, la barre blanche et le bush gris clair disparaissaient tous les
+deux pendant que le noir, le bleu et le rouge sortaient parfaitement. On mesure donc le
+**bruit du fond** (le 99e centile de la distance, aux bords) et tout ce qui en sort
+franchement est une pièce.
+
+Reste le cas qu'aucun seuil de couleur ne sauve : une pièce gris clair sur un fond gris
+clair. Elle a pourtant un **contour net**, et le fond n'en a pas — donc l'énergie de gradient
+entre dans le masque. Comme on ne cherche que des BOÎTES, le contour suffit : la composante
+est l'anneau, et sa boîte englobante est celle de la pièce.
+
+Deux détails qui comptent :
+
+- **fermeture avant ouverture.** La fermeture scelle les trous d'un contour fin, que
+  l'ouverture seule aurait effacé ; l'ouverture ensuite fait partir le grain du fond.
+- **on fusionne ce qui se frôle**, pas seulement ce qui se chevauche. Une pièce à deux
+  teintes — un imprimé, un pneu sur sa jante, un axe à bout foncé — se casse en deux
+  composantes séparées de quelques pixels, et l'envoyer en deux morceaux donnerait deux
+  mauvaises réponses au lieu d'une bonne.
+
+**L'image annotée est le garde-fou.** Deux pièces qui se touchent se retrouvent dans une
+seule boîte, et aucun code ne peut le deviner — mais ça se voit, et on reprend la photo.
+
+### Pourquoi tout se passe dans le téléphone, sauf l'écriture
+
+Drive met « secondes à minutes » à propager une écriture (voir *Un seul poste à la fois*).
+Un aller-retour PC par photo, avec une vingtaine de photos par sachet, ce serait vingt
+minutes d'attente par sac. La boucle ne quitte donc jamais le téléphone :
+
+- la **photo** passe par `<input type="file" capture>`, pas par `getUserMedia` : l'iframe
+  d'Apps Script ne peut pas recevoir la permission caméra, et l'appareil photo natif rend
+  de toute façon la pleine résolution ;
+- **Brickognize s'appelle directement depuis la page.** L'API répond
+  `Access-Control-Allow-Origin: *`, donc pas de proxy, pas de quota Apps Script, pas de
+  Netlify. Trois appels en parallèle au plus : l'API est gratuite et tenue par une seule
+  personne ;
+- le **PC n'entre en scène qu'à « Fermer la liste »**, par la file de commandes habituelle
+  (`catalogue_bag`). Une attente par sac, pas une par photo.
+
+### Les deux fichiers, et pourquoi ils sont là où ils sont
+
+| fichier | qui l'écrit | pourquoi |
+|---|---|---|
+| `catalogue_<set>.json` | le PC | l'inventaire restant, lot par lot. C'est lui qui contraint la reconnaissance. Republié quand les `.bsx` du set bougent (empreinte sur les `stat()` seuls, parce qu'il est relu à chaque poll) |
+| `catsessions.json` | le téléphone | les listes OUVERTES, par set, réécrites après chaque photo |
+
+Le `localStorage` du navigateur **ne convient pas** : la page vit sur le sous-domaine
+`n-xxxx.googleusercontent.com` d'Apps Script, qui tourne, et une heure de saisie partirait
+avec lui. La session va donc sur Drive après chaque photo, et le téléphone reposé au milieu
+d'un sachet reprend là où il en était.
+
+Un seul fichier pour tous les sets, et non un par set : la liste du téléphone le lit à
+chaque rafraîchissement pour afficher *« Reprendre le sac 4 (37 pièces) »*, et un fichier par
+set ferait une lecture Drive par set, à chaque fois.
+
+Les lots ne voyagent **pas** dans la commande, pour la même raison : `sort_commands.json` est
+relu à chaque rafraîchissement de la page, et deux cents lots dedans se paieraient à chaque
+fois. La commande ne porte que le nom du sac, et le PC refuse si ce n'est pas celui de la
+session ouverte.
+
+### Le bouton « Ajouter un sac », et le nom qu'il propose
+
+Il n'apparaît que tant qu'il reste à cataloguer — et ce n'est pas un seuil recalculé dans la
+page : **le PC ne publie `catalogue_<set>.json` que pour les sets en cataloguage**, donc sa
+présence EST le garde-fou (`CATALOGUE_DONE_FRACTION`, 5 %). Il n'apparaît pas non plus avant
+que les sachets soient séparés : l'ordre physique n'est pas négociable.
+
+Le nom se lit dans les fichiers. Avec `1, 1-1, 2, 2-1, 3` en place, il propose **`3 - 1`**
+(la suite du sachet en cours) **ou `4`** (le sachet suivant) — on ne peut pas deviner lequel,
+parce que ça dépend d'un fait physique que les fichiers ne portent pas : le sachet 3 est-il
+vide ? Les deux sont offerts, et un sac déjà existant reste choisissable (les pièces s'y
+ajoutent).
+
+### Ce que le PC fait à la fermeture, et ce qu'il ne fait pas
+
+`sortpack/photocat.apply_session` sort les lots de l'`Inventory*.bsx` et les met dans le sac,
+sous le même invariant que les déplacements de restants : les totaux par (pièce, couleur,
+état) sont comptés **avant et après**, et un écart annule tout. On ne crée rien, on déplace.
+
+Trois choses qui ne sautent pas aux yeux :
+
+- **le fichier du sac ne naît qu'à la fermeture.** `plan.discover_bags` saute un `.bsx` vide,
+  mais `gui.bag_count` compte les NOMS : un `4.bsx` créé d'avance ferait apparaître un
+  quatrième sac qui ne contient rien. Une session abandonnée ne laisse donc aucun fichier ;
+- **la catégorie est comblée.** `bsx.write_inventory` n'en écrit pas (BrickStore la remplit à
+  l'ouverture), donc un inventaire jamais ouvert n'en a aucune — et la Phase A trie SUR la
+  catégorie. Un lot arrivé sans elle se trierait avant tout le reste et partirait dans le
+  premier Sac. Elle est recopiée du lot d'inventaire, et prise dans `sortpack/categories.py`
+  quand il n'en a pas ;
+- **aucune remarque n'est écrite ici.** L'auto-apply décide sur l'empreinte des fichiers :
+  nos écritures le réveillent toutes seules, au passage suivant.
+
+Ce que l'inventaire ne tient plus est **rapporté, pas inventé** : si l'instantané du
+téléphone était vieux, on inscrit ce que l'inventaire a et le manque remonte lot par lot,
+avec un renvoi vers *Vérifier les quantités*. L'inscrire quand même casserait l'invariant.
+
+Et le cataloguage par photo travaille à l'échelle de **base** (un exemplaire), comme le
+cataloguage à la main : un inventaire déjà passé à ×N fait refuser la fermeture.
+
+### Mettre au point le découpage sans téléphone
+
+`appscript/build_harness.py --photo <fichier>` embarque une photo dans le banc d'essai local
+(data: URL, parce qu'un `file://` ne peut pas aller chercher une image à côté). À la console
+de la page :
+
+```js
+fetch(__TEST_PHOTO__).then(r => r.blob()).then(catShot)
+```
 
 ## Vérification des quantités (cross-check du cataloguage)
 

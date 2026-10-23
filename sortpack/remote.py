@@ -10,6 +10,12 @@ demandes" button, or `python -m sortpack.remote` via Task Scheduler):
    drops a request the PC executes:
        "build_cfb"  → Construire fichier CFB  (consolidate + split "x" + write master /
                       restants; emails them when config.REMOTE_CFB_EMAIL).
+       "catalogue_bag" → Fermer la liste du cataloguage par photo : inscrire au sac ce que
+                      le téléphone a reconnu, en le sortant de l'Inventory*.bsx
+                      (sortpack/photocat.py). Les lots ne voyagent PAS dans la commande —
+                      ils sont dans `catsession_<set>.json`, que le téléphone réécrit après
+                      chaque photo : `sort_commands.json` est relu à chaque rafraîchissement
+                      du téléphone, et 200 lots dedans le feraient payer à chaque fois.
    Two more carry a BATCH name instead of a set (payload.batch), because an envoi leaves
    as ONE master and no single set owns that step:
        "batch_check" → Vérifier l'envoi  (batch.preflight: what blocks the master, in
@@ -54,7 +60,7 @@ from . import lock
 COMMANDS_FILE = config.state_path("sort_commands.json")
 AUTO_APPLY_FILE = config.state_path("auto_apply.json")
 # per-set actions (need the set's folder) vs global jobs (the Finances tab's buttons)
-_SET_ACTIONS = ("build_cfb", "restant_done", "restant_move")
+_SET_ACTIONS = ("build_cfb", "restant_done", "restant_move", "catalogue_bag")
 _GLOBAL_ACTIONS = ("sync_purchases", "buy_report", "cfb_inventory", "end_of_month",
                    "check_cookies")
 # Portée ENVOI : ni par set (un envoi n'a pas de dossier de set) ni globale (il faut savoir
@@ -316,6 +322,47 @@ def _do_restant_move(folder, payload, wdb):
     if res["remarks_changed"]:
         msg += f" {res['remarks_changed']} autre(s) remarque(s) recalculée(s)."
     return msg + _earlier_note(res)
+
+
+def _do_catalogue_bag(folder, payload):
+    """« Fermer la liste » du cataloguage par photo : inscrire la session au sac.
+
+    Les lots viennent de `catsession_<set>.json` — le fichier que le téléphone réécrit après
+    chaque photo — et non de la commande, pour que `sort_commands.json` reste petit. La
+    commande ne porte que le nom du sac, et il doit correspondre à celui de la session : une
+    session fermée deux fois, ou fermée après qu'on en a ouvert une autre, n'inscrirait
+    sinon pas ce qu'on croit.
+    """
+    from . import photocat
+    from .plan import set_number
+    payload = payload or {}
+    bag = str(payload.get("bag") or "").strip()
+    if not bag:
+        raise RuntimeError("sac non précisé")
+    set_no = set_number(folder)
+    lots = payload.get("lots")
+    if not lots:
+        session = photocat.read_session(set_no)
+        if not session:
+            raise RuntimeError("aucune session de cataloguage pour ce set — "
+                               "elle a peut-être déjà été inscrite")
+        s_bag = str(session.get("bag") or "").strip()
+        if s_bag and photocat.normalize_label(s_bag) != photocat.normalize_label(bag):
+            raise RuntimeError(f"la session ouverte est celle du sac {s_bag}, pas du {bag}")
+        lots = session.get("lots") or []
+    res = photocat.apply_session(folder, bag, lots)
+    photocat.clear_session(set_no)
+    msg = f"sac {res['bag']} : {res['lots']} lots, {res['pieces']} pièces"
+    if res["shorts"]:
+        # Le téléphone ne laisse ajouter que ce que l'inventaire tient : si on arrive ici,
+        # son instantané était vieux (ou l'inventaire est faux). Ça se dit, ça ne se tait pas.
+        n = sum(s["asked"] - s["written"] for s in res["shorts"])
+        msg += (f" — ⚠ {n} pièce(s) de {len(res['shorts'])} lot(s) absentes de l'inventaire, "
+                "non inscrites : lance « Vérifier les quantités »")
+    msg += f" ; reste {res['inv_qty']} pièces ({res['left_fraction'] * 100:.0f} %)"
+    if res["catalogue_done"]:
+        msg += " — cataloguage terminé"
+    return msg
 
 
 def refresh_phone_index(log=None):
@@ -690,6 +737,9 @@ def process_pending(log=print, backup=True, email=None, wdb=None, force=False):
                         result = _do_restant_done(folder, cmd.get("payload"), _wdb)
                     else:
                         result = _do_restant_move(folder, cmd.get("payload"), _wdb)
+                elif action == "catalogue_bag":
+                    # Ni poids ni catalogue : on déplace des lots entre deux .bsx du set.
+                    result = _do_catalogue_bag(folder, cmd.get("payload"))
                 else:
                     result = _do_build_cfb(folder, email)
             _update(cid, status="done", result=result, finished=_now())

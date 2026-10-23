@@ -310,6 +310,15 @@ def _write_sort_index(sets):
             json.dump(payload, f, ensure_ascii=False, indent=2)
     except OSError:
         pass
+    # Le cataloguage par photo lit un inventaire par set, à côté de l'index. Il se republie
+    # ICI parce que c'est le seul point par lequel passent les trois chemins qui tiennent
+    # les fichiers du téléphone à jour (refresh du GUI, son poll, la tâche planifiée) — et
+    # l'index qu'on vient d'écrire dit déjà quels sets sont en cataloguage.
+    try:
+        from sortpack import photocat
+        photocat.refresh_all(sets)
+    except Exception:
+        pass
 
 
 def _bsx_files(folder):

@@ -631,6 +631,24 @@ SORT_INDEX_FILE = state_path("sort_index.json")
 # whenever the inventory changes. {set} = the set number.
 BAG_HELP_FILE = "restants_{set}.json"
 
+# --- Cataloguage par photo (sortpack/photocat.py) ----------------------------
+# Le telephone photographie une dizaine de pieces etalees, les decoupe, demande a
+# Brickognize ce que chacune est, et le PC inscrit le resultat dans un .bsx. Deux fichiers
+# par set, dans le meme dossier d'etat que les autres instantanes du telephone :
+#   catalogue_<set>.json  — ecrit par le PC, lu par le telephone : ce que l'inventaire
+#       contient ENCORE, lot par lot. C'est lui qui CONTRAINT la reconnaissance : parmi les
+#       candidats que rend Brickognize, le bon est celui qui est encore a l'inventaire du
+#       set, avec la quantite qu'il faut. Sans cette contrainte on croirait le candidat
+#       n°1, qui confond le noir et le gris fonce.
+#   catsessions.json      — les listes OUVERTES, par numero de set : ecrit par le TELEPHONE
+#       apres chaque photo, lu par le PC a la fermeture. Le navigateur n'est pas un endroit
+#       ou ranger une heure de saisie — le sous-domaine d'Apps Script tourne, et le
+#       localStorage part avec lui. Un seul fichier pour tous les sets, parce que la liste
+#       des sets du telephone le lit a chaque rafraichissement pour afficher « sac 4 en
+#       cours » : un fichier par set ferait une lecture Drive par set, a chaque fois.
+CATALOGUE_FILE = "catalogue_{set}.json"
+CATALOGUE_SESSIONS_FILE = "catsessions.json"
+
 # The phone's Finances / Achats tabs read ONE more snapshot the PC writes beside the index:
 # the ranked buy list, the budget ("reste a investir"), the CFB inventory values, the cookie
 # status and the freshness ages. Same folder, same read-only contract (sortpack/mobile.py).

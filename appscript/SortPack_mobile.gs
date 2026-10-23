@@ -41,8 +41,14 @@ var DASHBOARD_FILE = 'dashboard.json';
 var BATCH_FILE = 'batches.json';     // le registre des envois (ecrit aussi par le PC)
 
 // Per-set requests (carry a set key) vs the global jobs the Finances tab fires (key '').
-var SET_ACTIONS = ['restants', 'build_cfb', 'restant_done', 'restant_move'];
+var SET_ACTIONS = ['restants', 'build_cfb', 'restant_done', 'restant_move', 'catalogue_bag'];
 var BAG_HELP_FILE = 'restants_{set}.json';   // per-set, written by the PC at Apply
+// Cataloguage par photo. `catalogue_<set>.json` est ecrit par le PC (ce que l'inventaire
+// contient ENCORE : c'est lui qui contraint la reconnaissance a ce que la boite contient).
+// `catsessions.json` est ecrit par NOUS apres chaque photo, et lu par le PC a la fermeture :
+// une heure de saisie ne se garde pas dans le navigateur, dont le sous-domaine tourne.
+var CATALOGUE_FILE = 'catalogue_{set}.json';
+var CAT_SESSIONS_FILE = 'catsessions.json';
 var GLOBAL_ACTIONS = ['sync_purchases', 'buy_report', 'cfb_inventory', 'end_of_month',
                       'check_cookies'];
 // Portee ENVOI : ni un set (pas de dossier) ni un job global (il faut savoir lequel). Le
@@ -107,6 +113,9 @@ function getSets() {
   cmds.forEach(function (c) {                          // array is chronological → last wins
     if (c.key && (c.action === 'restants' || c.action === 'build_cfb')) latest[c.key] = c;
   });
+  // Les listes de cataloguage OUVERTES, en UNE lecture pour tous les sets — la carte doit
+  // pouvoir dire « sac 4 en cours, 37 pieces » sans qu'on ouvre un fichier par set.
+  var cats = readJson_(CAT_SESSIONS_FILE) || {};
   var out = (idx.sets || []).map(function (s) {
     var e = st[s.key] || {};
     var bags = Number(s.bag_count || 0);
@@ -135,6 +144,14 @@ function getSets() {
       has_inventory: (s.has_inventory === undefined ? true : !!s.has_inventory),
       restants_done: !!s.restants_done
     };
+    // La liste de cataloguage en cours sur ce set, s'il y en a une. `cat_ready` dit si le
+    // bouton « Ajouter un sac » a de quoi travailler : le PC ne publie l'inventaire que des
+    // sets dont il reste plus que la done-fraction a cataloguer (5 %), donc sa presence EST
+    // le garde-fou — la page n'a aucun seuil a recalculer.
+    var cs = cats[String(s.number || '')];
+    if (cs) row.cat_session = { bag: cs.bag || '', lots: (cs.lots || []).length,
+                                pieces: Number(cs.pieces || 0), photos: Number(cs.photos || 0) };
+    row.cat_ready = !!(s.cataloguing && row.has_inventory);
     var c = latest[s.key];
     if (c) row.cmd = { action: c.action, status: c.status, result: c.result || '' };
     return row;
@@ -273,6 +290,106 @@ function getRestants(setNumber) {
   return data;
 }
 
+
+// ── Cataloguage par photo ────────────────────────────────────────────────────
+
+/** Ce qu'il faut pour cataloguer un set en photo : l'inventaire que le PC publie (ce qui
+ *  reste a cataloguer, lot par lot), la liste en cours s'il y en a une, et l'etat de la
+ *  derniere fermeture. L'inventaire est le FILTRE de la reconnaissance : parmi les candidats
+ *  que rend Brickognize, on retient celui qui est encore la, dans la bonne couleur et en
+ *  quantite suffisante. Sans lui on croirait le candidat n°1, qui confond noir et gris. */
+function getCatalogue(setNumber) {
+  var n = String(setNumber || '').trim();
+  var data = readJson_(CATALOGUE_FILE.replace('{set}', n));
+  if (!data) {
+    return { ok: false, error: "Pas d'inventaire publié pour ce set — le PC ne le publie "
+                             + "que tant qu'il reste des pièces à cataloguer." };
+  }
+  data.ok = true;
+  data.session = (readJson_(CAT_SESSIONS_FILE) || {})[n] || null;
+  var cmds = (readJson_(COMMANDS_FILE) || { commands: [] }).commands || [];
+  var last = null;
+  cmds.forEach(function (c) {                          // chronologique → le dernier gagne
+    if (c.action === 'catalogue_bag' && String(c.number || '') === n) {
+      // L'ID voyage : sans lui, la page confondrait la fermeture qu'elle attend avec la
+      // PRECEDENTE, deja « done » dans la file, et annoncerait un succes qui n'est pas le sien.
+      last = { id: c.id || '', status: c.status, result: c.result || '',
+               created: c.created || '', bag: (c.payload && c.payload.bag) || '' };
+    }
+  });
+  data.cmd = last;
+  return data;
+}
+
+/** Enregistrer la liste en cours, apres chaque photo acceptee.
+ *
+ *  C'est le seul filet : le `localStorage` du navigateur vit sur le sous-domaine
+ *  `n-xxxx.googleusercontent.com` d'Apps Script, qui TOURNE — une heure de saisie peut
+ *  disparaitre entre deux ouvertures de la page. Ici, elle survit a tout, y compris au
+ *  telephone qu'on repose. */
+function saveCatSession(setNumber, bag, lots, photos) {
+  var n = String(setNumber || '').trim();
+  if (!n) return { ok: false, error: 'set manquant' };
+  if (!/^\s*\d+\s*(-\s*\d+\s*)?$/.test(String(bag || ''))) {
+    return { ok: false, error: 'nom de sac invalide' };
+  }
+  var clean = [], pieces = 0;
+  (lots || []).forEach(function (l) {
+    var q = Math.round(Number(l && l.qty) || 0);
+    if (!l || !l.k || q <= 0 || q > 9999) return;
+    clean.push({ k: String(l.k), qty: q, id: String(l.id || ''), color: String(l.color || ''),
+                 name: String(l.name || ''), color_name: String(l.color_name || ''),
+                 score: Number(l.score || 0) });
+    pieces += q;
+  });
+  if (clean.length > 2000) return { ok: false, error: 'liste trop longue' };
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var data = readJson_(CAT_SESSIONS_FILE) || {};
+    data[n] = { bag: String(bag).trim(), lots: clean, pieces: pieces,
+                photos: Math.round(Number(photos) || 0),
+                saved: new Date().toISOString().slice(0, 19) };
+    writeJson_(CAT_SESSIONS_FILE, data);
+    return { ok: true, lots: clean.length, pieces: pieces };
+  } finally {
+    try { lock.releaseLock(); } catch (x) {}
+  }
+}
+
+/** Jeter la liste en cours sans rien inscrire. Aucun .bsx n'a ete touche — l'inscription
+ *  n'arrive qu'a la fermeture — donc il n'y a rien a defaire cote fichiers. */
+function dropCatSession(setNumber) {
+  var n = String(setNumber || '').trim();
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    var data = readJson_(CAT_SESSIONS_FILE) || {};
+    if (!data[n]) return { ok: true, gone: true };
+    delete data[n];
+    writeJson_(CAT_SESSIONS_FILE, data);
+    return { ok: true };
+  } finally {
+    try { lock.releaseLock(); } catch (x) {}
+  }
+}
+
+/** « Fermer la liste » : le PC inscrit la session au sac et la sort de l'inventaire.
+ *
+ *  Les lots ne voyagent PAS dans la commande — `sort_commands.json` est relu a chaque
+ *  rafraichissement de la page, et 200 lots dedans se paieraient a chaque fois. Le PC lit
+ *  `catsessions.json`, et refuse si le sac ne correspond pas a celui de la session. */
+function closeCatBag(key, setNumber, bag) {
+  var n = String(setNumber || '').trim();
+  var s = (readJson_(CAT_SESSIONS_FILE) || {})[n];
+  if (!s || !(s.lots || []).length) {
+    return { ok: false, error: 'aucune liste en cours pour ce set' };
+  }
+  if (String(s.bag || '').trim() !== String(bag || '').trim()) {
+    return { ok: false, error: 'la liste ouverte est celle du sac ' + s.bag };
+  }
+  return queueCommand(key, 'catalogue_bag', { bag: String(bag).trim(), set: n });
+}
 
 /** Persist the checked-off bag numbers for one set (writes the shared set_status.json). */
 function setBags(key, done) {
