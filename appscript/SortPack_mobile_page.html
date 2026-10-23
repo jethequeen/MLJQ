@@ -131,6 +131,10 @@
            border:1px solid var(--line); border-radius:999px; width:18px; height:18px;
            font-size:9px; line-height:16px; color:var(--mute); padding:0; }
   .thz{ border:0; background:none; padding:0; line-height:0; }
+  /* L'image du catalogue, à côté de la découpe : la comparaison se fait d'un coup d'œil. */
+  .cat{ width:38px; height:38px; object-fit:contain; flex:none; }
+  .find .ft.sm{ font-size:12.5px; font-weight:650; }
+  .find .ft.sm span{ font-size:10.5px; font-weight:500; line-height:1.3; }
   .qty.ok{ color:var(--mute); }
   .qty.ok.on{ color:var(--green); }
   /* La découpe en grand : 46 px ne suffisent pas à juger d'une pièce, et c'est EXACTEMENT
@@ -2841,7 +2845,6 @@
   function catDraw(fx, fy, fw, fh){
     catAddManual(Math.round(fx * CAT.work.w), Math.round(fy * CAT.work.h),
                  Math.round(fw * CAT.work.w), Math.round(fh * CAT.work.h));
-    toast('Cadre ajouté — il partira avec les autres');
   }
 
   function catAddManual(x, y, bw, bh){
@@ -2987,14 +2990,16 @@
    *  trompait : une ligne à 88 % pouvait être signalée sans qu'on voie pourquoi. Les quatre
    *  autres causes n'entrent pas dans ce chiffre, donc elles se disent en toutes lettres. */
   function findWhy(f){
-    if(!f.pick) return ['aucun candidat du set'];
+    if(!f.pick) return [{k:'none', t:'aucun candidat du set'}];
     var p = f.pick, why = [];
-    if(p.si < SURE_ITEM) why.push('pièce à ' + Math.round(p.si * 100) + ' %');
+    // Les motifs « score » décident, mais ne s'ÉCRIVENT pas : la note est déjà affichée en
+    // chiffres au bout de la ligne, et « pièce à 39 % » à côté de « 39 % » n'apprend rien.
+    if(p.si < SURE_ITEM) why.push({k:'score', t:''});
     if(!p.deduced && !p.manual && p.cs < SURE_COLOR){
-      why.push('couleur à ' + Math.round(p.cs * 100) + ' %');
+      why.push({k:'score', t:''});
     }
-    if(p.deep) why.push('repêchée au rang ' + (p.rank + 1));
-    if(f.edge) why.push('touche le bord du cadre');
+    if(p.deep) why.push({k:'rank', t:'repêchée au rang ' + (p.rank + 1)});
+    if(f.edge) why.push({k:'edge', t:'touche le bord du cadre'});
     // PAS la couverture de la boîte de Brickognize : mesuré, une pièce seule n'en couvre que
     // 50 %, donc tout seuil là-dessus signalerait tout. Le cadre sur la vignette informe par
     // sa POSITION — il n'entoure qu'une pièce sur une découpe qui en contient deux — et c'est
@@ -3275,6 +3280,7 @@
       // qui est juste : ce n'est plus la même chose qu'on avait regardée.
       g.ok = !g.solo && !!CAT.okd[g.gid];
       g.why = g.ok ? [] : findWhy(g.weak);
+      g.note = g.why.filter(function(w){ return w.t; }).map(function(w){ return w.t; });
       g.status = g.solo ? 'absent' : (g.why.length ? 'doubt' : 'ok');
       g.bump = Math.max(0, CAT.bump[g.gid] || 0);
       g.qty = g.members.length + g.bump;
@@ -3318,15 +3324,22 @@
     if(g.lot){
       var l = g.lot, p = g.weak.pick, pc = Math.round(p.si * 100);
       var cls = p.si >= SURE_ITEM ? 'good' : (p.si >= 0.4 ? 'mid' : 'bad');
-      var note = g.why.slice();
+      var note = g.note.slice();
       if(g.ok) note.push('validé à la main');
       if(!g.why.length && !g.ok){
         if(p.deduced) note.push('couleur déduite');
         if(p.manual) note.push('choisie à la main');
       }
       if(g.bump) note.push('+' + g.bump + ' à la main');
-      h += '<button class="ft" data-gcand="' + esc(g.gid) + '">' + esc(l.name || l.id)
-         + '<span>' + esc(l.color_name || ('couleur ' + l.color)) + ' · ' + esc(l.id)
+      // L'IMAGE du candidat, à côté de la découpe : c'est la comparaison qui décide, bien
+      // plus qu'un nom. « Plate 1 x 2 » et « Tile 1 x 2 » se lisent pareil et ne se
+      // ressemblent pas. Le nom passe donc en petit, et l'id de pièce disparaît — il ne sert
+      // à rien à l'œil, et il prenait la place de la couleur.
+      h += '<img class="cat" src="' + partImg({type:l.type, color_id:l.color, id:l.id})
+         + '" onerror="this.style.visibility=&quot;hidden&quot;">';
+      h += '<button class="ft sm" data-gcand="' + esc(g.gid) + '">'
+         + esc(l.color_name || ('couleur ' + l.color))
+         + '<span>' + esc(l.name || l.id)
          + (note.length ? ' · ' + esc(note.join(' · ')) : '') + '</span></button>';
       // Validé : un crochet, pas « 100 % ». La note est celle de Brickognize, et la réécrire
       // à 100 laisserait croire que la machine était sûre alors que c'est l'œil qui a tranché.
