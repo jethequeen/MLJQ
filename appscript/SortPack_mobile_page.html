@@ -956,10 +956,10 @@
    *  not logging a purchase while sorting a bag — so it steps aside. */
   function syncFab(){
     var fab = document.getElementById('fab');
-    // L'Historique regarde ce qui est parti : on n'y saisit pas un achat, et le bouton
-    // flottant passait par-dessus la derniere carte pour rien.
-    if(fab) fab.style.display = (TAB==='fin' || TAB==='hist' || PANEL.key || CAT.key)
-                              ? 'none' : '';
+    // La puce d'achat ne vit que dans l'onglet Achats. Ailleurs elle passe par-dessus la
+    // derniere carte pour une action qui n'a rien a voir avec ce qu'on regarde : on ne
+    // saisit pas un achat en triant un sac, ni en lisant ce qui est deja parti.
+    if(fab) fab.style.display = (TAB === 'achats') ? '' : 'none';
   }
 
   function render(){
