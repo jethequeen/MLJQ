@@ -1601,6 +1601,25 @@ minuscules) : **8 sur 8 justes, pièce et couleur**, dont six par couleur dédui
 `3713` (Technic Bush) se sont départagés par la vraie prédiction de couleur — Red 0,78 et
 Light Bluish Gray 0,68. Une seule a été marquée « à vérifier », la barre blanche, notée 0,55.
 
+### Le barème de « à vérifier »
+
+L'écran de validation ne montre **que les lignes à vérifier**, de la moins sûre à la plus
+sûre ; les autres sont masquées derrière un bouton. Au premier essai réel, aucune pièce
+au-dessus de 80 % n'a eu besoin d'être corrigée : les faire défiler pour trouver les sept qui
+comptent est du travail pour rien.
+
+Une ligne est signalée quand l'une de ces cinq choses est vraie, et le motif est **écrit sur
+la ligne** — le pourcentage affiché est la note de la PIÈCE et elle seule, donc une ligne à
+88 % signalée pour sa couleur était incompréhensible sans ça :
+
+| motif | seuil |
+|---|---|
+| la pièce est peu sûre | sous 80 % (, venu de l'essai réel ; c'était 60 % avant) |
+| la couleur est peu sûre, sans être déduite | sous 45 % () |
+| l'inventaire l'a repêchée loin | au-delà du rang 3 () |
+| la découpe touche le bord du cadre | — |
+| aucun candidat n'est au set | — |
+
 Les ids de Brickognize sont ceux de **BrickLink** (`3001`, couleur `5` = Red), donc rien à
 convertir : c'est déjà ce que `<ItemID>` et `<ColorID>` attendent dans un `.bsx`.
 

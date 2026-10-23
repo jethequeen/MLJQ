@@ -1036,6 +1036,11 @@
       card.querySelectorAll('.act').forEach(function(btn){
         btn.addEventListener('click', function(){
           var a = btn.getAttribute('data-act');
+          // `.act` est une CLASSE DE STYLE, portée aussi par des boutons qui ont leur propre
+          // gestionnaire (« Ajouter un sac »). Sans ce garde, un bouton sans `data-act`
+          // arrivait ici avec a = null et tombait dans la branche par défaut de queueAction,
+          // qui demandait « Calculer les restants pour ce set ? » — constaté au premier essai.
+          if(!a) return;
           // « Ouverture terminée » n'est pas une demande au PC : c'est une phase, écrite tout
           // de suite dans le registre partagé. Le PC enchaîne ensuite de lui-même.
           if(a === 'separated') return finishSeparating(key, btn);
@@ -1844,7 +1849,11 @@
                                // prennent en pleine résolution : Brickognize a besoin du détail.
   var SEG_MARGIN = 0.12;       // marge autour de chaque boîte, en fraction de son grand côté
   var CROP_PX = 420;           // côté long de la découpe envoyée à Brickognize
-  var SURE_ITEM = 0.60, SURE_COLOR = 0.45;
+  // Au-dessus de SURE_ITEM, la reconnaissance passe sans être signalée. 0,80 vient du
+  // PREMIER ESSAI RÉEL, pas d'une estimation : au-dessus de 80 %, aucune pièce n'a eu besoin
+  // d'être corrigée. Le seuil était à 0,60 avant, ce qui affichait en vert des pièces entre
+  // 60 et 80 % dont personne n'avait vérifié qu'elles étaient justes.
+  var SURE_ITEM = 0.80, SURE_COLOR = 0.45;
   var DEEP_RANK = 3;           // au-delà de ce rang, le repêchage est signalé : un choix pris
                                // au rang 17 à 0,28 pendant que le candidat brut est à 0,76 est
                                // juste assez souvent pour être gardé, et faux assez souvent
@@ -1852,14 +1861,14 @@
 
   var CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
              lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-             finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false};
+             finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:''};
 
   function openCat(key, bag){
     var s = SETS.filter(function(x){ return x.key === key; })[0];
     if(!s) return;
     CAT = {key:key, number:s.number, name:s.name, bag:String(bag || ''), data:null,
            loading:true, err:null, lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null,
-           boxes:[], overlay:'', finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false};
+           boxes:[], overlay:'', finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:''};
     render();
     google.script.run.withSuccessHandler(function(d){
       if(CAT.key !== key) return;
@@ -1892,7 +1901,7 @@
     if(CAT.shot && CAT.shot.bmp && CAT.shot.bmp.close) try{ CAT.shot.bmp.close(); }catch(e){}
     CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
            lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-           finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false};
+           finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:''};
     render();
   }
 
@@ -2728,13 +2737,38 @@
     return pairs.slice(0, 8);
   }
 
+  /** POURQUOI cette ligne est à vérifier. Vide = elle ne l'est pas.
+   *
+   *  Le pourcentage affiché est la note de la PIÈCE chez Brickognize, et elle seule — ce qui
+   *  trompait : une ligne à 88 % pouvait être signalée sans qu'on voie pourquoi. Les quatre
+   *  autres causes n'entrent pas dans ce chiffre, donc elles se disent en toutes lettres. */
+  function findWhy(f){
+    if(!f.pick) return ['aucun candidat du set'];
+    var p = f.pick, why = [];
+    if(p.si < SURE_ITEM) why.push('pièce à ' + Math.round(p.si * 100) + ' %');
+    if(!p.deduced && !p.manual && p.cs < SURE_COLOR){
+      why.push('couleur à ' + Math.round(p.cs * 100) + ' %');
+    }
+    if(p.deep) why.push('repêchée au rang ' + (p.rank + 1));
+    if(f.edge) why.push('touche le bord du cadre');
+    // PAS la couverture de la boîte de Brickognize : mesuré, une pièce seule n'en couvre que
+    // 50 %, donc tout seuil là-dessus signalerait tout. Le cadre sur la vignette informe par
+    // sa POSITION — il n'entoure qu'une pièce sur une découpe qui en contient deux — et c'est
+    // l'œil qui le lit, pas un seuil.
+    return why;
+  }
+
   function findStatus(f){
     if(!f.pick) return 'absent';
+    return findWhy(f).length ? 'doubt' : 'ok';
+  }
+
+  /** De quoi trier : la moins sûre en premier. Une ligne sans candidat passe devant tout. */
+  function findRank(f){
+    if(!f.pick) return -1;
     var p = f.pick;
-    // Un repêchage profond ou une découpe qui touche le bord passent en « à vérifier » même
-    // si la note est bonne : ce sont précisément les cas où la note ne dit rien de juste.
-    if(p.deep || f.edge) return 'doubt';
-    return (p.si >= SURE_ITEM && (p.deduced || p.cs >= SURE_COLOR)) ? 'ok' : 'doubt';
+    return Math.min(p.si, (p.deduced || p.manual) ? 1 : p.cs) - (p.deep ? 0.5 : 0)
+           - (f.edge ? 0.3 : 0);
   }
 
   function catRecognise(){
@@ -2831,8 +2865,7 @@
   function catClose(){
     var pieces = catPieces();
     if(!pieces){ toast('La liste est vide'); return; }
-    if(!confirm('Fermer le sac ' + CAT.bag + ' avec ' + pieces + ' pièce(s) ?\n\n'
-              + 'Le PC écrit la liste et les sort de l’inventaire.')) return;
+    CAT.confirm = '';
     CAT.saving = true; render();
     google.script.run.withSuccessHandler(function(r){
       CAT.saving = false;
@@ -2883,10 +2916,10 @@
    *  l'inventaire non plus si la pièce fantôme est dans la boîte. Mais le cadre, lui,
    *  n'entoure qu'une des deux, et ça se voit.
    *
-   *  Pas de seuil automatique là-dessus : mesuré, une fusion couvre 40 % de la découpe
-   *  contre 50 % pour les pièces seules — trop proche pour trancher sans signaler des
-   *  pièces parfaitement normales. On montre, on ne décide pas. Au-dessous de 55 % le cadre
-   *  passe en orange, comme une invitation à regarder, pas comme un verdict.
+   *  Aucun seuil là-dessus, et surtout pas de couleur qui ferait verdict : mesuré, une
+   *  fusion couvre 40 % de la découpe contre 50 et 51 % pour les pièces seules. Tout seuil
+   *  signalerait donc la quasi-totalité des lignes. Ce qui se lit, c'est la POSITION du
+   *  cadre, pas sa taille — et ça se lit à l'œil, en une demi-seconde.
    */
   function catThumb(f){
     if(!f.crop) return '<span class="cw" style="width:46px;height:46px"></span>';
@@ -2897,12 +2930,34 @@
           + '<img src="' + f.crop + '">';
     if(f.bb){
       var b = f.bb;
-      h += '<span class="bb' + (b.cover < 0.55 ? ' part' : '') + '" style="left:'
+      h += '<span class="bb" style="left:'
          + (b.l * 100).toFixed(1) + '%;top:' + (b.u * 100).toFixed(1) + '%;width:'
          + ((b.r - b.l) * 100).toFixed(1) + '%;height:' + ((b.d - b.u) * 100).toFixed(1)
          + '%"></span>';
     }
     return h + '</span>';
+  }
+
+  /** Les noms de sacs à proposer, lus dans ceux qui existent.
+   *
+   *  `next` : le prochain GROS sac. `subs` : pour chaque gros déjà commencé, son prochain
+   *  petit (1 seul → « 1 - 1 » ; 3 et 3-1 → « 3 - 2 »). Le PC n'en publie que deux dans
+   *  `next_bags`, ceux du plus grand numéro ; ici on les a tous, parce que rien n'oblige à
+   *  finir le sac 3 avant d'ajouter un petit sac au 1. */
+  function catBagChoices(d){
+    var mains = {}, rx = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/;
+    (d.bags || []).forEach(function(b){
+      var m = rx.exec(b);
+      if(!m) return;
+      var n = parseInt(m[1], 10), s = m[2] ? parseInt(m[2], 10) : 0;
+      if(!(n in mains) || s > mains[n]) mains[n] = s;
+    });
+    var nums = Object.keys(mains).map(Number).sort(function(a, b){ return a - b; });
+    return {
+      next: String((nums.length ? nums[nums.length - 1] : 0) + 1),
+      subs: nums.map(function(n){ return n + ' - ' + (mains[n] + 1); }),
+      done: (d.bags || []).slice()
+    };
   }
 
   function catFindHtml(f){
@@ -2913,12 +2968,13 @@
     if(f.pick){
       var l = f.pick.lot, pc = Math.round(f.pick.si * 100);
       var cls = f.pick.si >= SURE_ITEM ? 'good' : (f.pick.si >= 0.4 ? 'mid' : 'bad');
-      var note = [];
-      if(f.pick.deduced) note.push('couleur déduite');
-      if(f.pick.manual) note.push('choisie à la main');
-      else if(f.pick.rescued) note.push('repêchée au rang ' + (f.pick.rank + 1)
-                                        + '/' + (f.pick.crank + 1));
-      if(f.edge) note.push('⚠ touche le bord');
+      // Le MOTIF d'abord quand il y en a un : c'est ce qu'on est venu lire. Sinon, la note
+      // utile (couleur déduite, choisie à la main) — et rien du tout si tout va de soi.
+      var why = findWhy(f), note = why.slice();
+      if(!why.length){
+        if(f.pick.deduced) note.push('couleur déduite');
+        if(f.pick.manual) note.push('choisie à la main');
+      }
       h += '<button class="ft" data-cand="' + f.i + '">' + esc(l.name || l.id)
          + '<span>' + esc(l.color_name || ('couleur ' + l.color)) + ' · ' + esc(l.id)
          + (note.length ? ' · ' + esc(note.join(' · ')) : '') + '</span></button>';
@@ -2990,15 +3046,32 @@
     // Le choix du sac : la suite du sac en cours, ou le suivant. Rien dans les fichiers
     // ne dit lequel — ça dépend d'un fait physique, donc c'est à nous de trancher.
     if(!catPieces() && CAT.stage === 'idle'){
-      h += '<div class="frow">';
-      (d.next_bags || []).concat(d.bags || []).forEach(function(b){
-        h += '<button class="fchip' + (CAT.bag === b ? ' on' : '') + '" data-bag="' + esc(b) + '">'
-           + esc(b) + '</button>';
-      });
-      h += '</div>';
-      if((d.bags || []).indexOf(CAT.bag) >= 0){
-        h += '<div class="hint">Le sac ' + esc(CAT.bag) + ' existe déjà : les pièces s&#39;y '
-           + 'ajouteront.</div>';
+      // Les DEUX vrais choix d'abord, séparés, parce que ce sont deux gestes physiques
+      // différents : ou bien on entame le gros sac suivant, ou bien on fait un petit sac de
+      // plus dans un gros déjà commencé. Une liste plate mêlait les deux aux sacs déjà faits.
+      var ch = catBagChoices(d);
+      h += '<div class="lbl" style="margin-top:12px">Prochain gros sac</div>'
+         + '<div class="frow"><button class="fchip' + (CAT.bag === ch.next ? ' on' : '')
+         + '" data-bag="' + esc(ch.next) + '">' + esc(ch.next) + '</button></div>';
+      if(ch.subs.length){
+        h += '<div class="lbl">Petit sac d’un gros déjà commencé</div><div class="frow">';
+        ch.subs.forEach(function(b){
+          h += '<button class="fchip' + (CAT.bag === b ? ' on' : '') + '" data-bag="'
+             + esc(b) + '">' + esc(b) + '</button>';
+        });
+        h += '</div>';
+      }
+      if(ch.done.length){
+        h += '<div class="lbl">Ou ajouter à un sac déjà fait</div><div class="frow">';
+        ch.done.forEach(function(b){
+          h += '<button class="fchip' + (CAT.bag === b ? ' on' : '') + '" data-bag="'
+             + esc(b) + '">' + esc(b) + '</button>';
+        });
+        h += '</div>';
+        if(ch.done.indexOf(CAT.bag) >= 0){
+          h += '<div class="hint">Le sac ' + esc(CAT.bag) + ' existe déjà : les pièces s&#39;y '
+             + 'ajouteront, elles ne le remplaceront pas.</div>';
+        }
       }
     }
 
@@ -3025,13 +3098,34 @@
     } else if(CAT.stage === 'review'){
       var keep = CAT.finds.filter(function(f){ return !f.drop && f.pick; });
       var npc = keep.reduce(function(a, f){ return a + f.qty; }, 0);
-      var doubt = keep.filter(function(f){ return findStatus(f) === 'doubt'; }).length;
-      var abs = CAT.finds.filter(function(f){ return !f.drop && !f.pick; }).length;
-      h += '<div class="hint">' + npc + ' pièce(s) reconnue(s)'
-         + (doubt ? ' · ' + doubt + ' à vérifier' : '')
-         + (abs ? ' · ' + abs + ' non reconnue(s)' : '')
-         + '. Touche une ligne pour voir les autres candidats.</div>';
-      CAT.finds.forEach(function(f){ h += catFindHtml(f); });
+      var todo = CAT.finds.filter(function(f){
+        return !f.drop && findStatus(f) !== 'ok'; });
+      var sure = CAT.finds.length - todo.length;
+
+      // On ne montre que ce qui demande l'œil, de la moins sûre à la plus sûre. Les lignes
+      // sûres sont justes — au-dessus de 80 % aucune n'a eu besoin d'être corrigée au premier
+      // essai réel — donc les faire défiler pour trouver les sept qui comptent est du travail
+      // pour rien. Elles restent atteignables d'un bouton, parce que « masqué » ne doit jamais
+      // vouloir dire « inaccessible » sur des lignes qu'on s'apprête à écrire dans un .bsx.
+      var shown = CAT.all ? CAT.finds.slice() : todo.slice();
+      shown.sort(function(a, b){ return findRank(a) - findRank(b); });
+
+      h += '<div class="hint"><b>' + npc + ' pièce(s) reconnue(s)</b>'
+         + (todo.length ? ' · <b>' + todo.length + ' à vérifier</b>' : ' · rien à vérifier')
+         + (sure ? ' · ' + sure + ' sûre(s)' + (CAT.all ? '' : ', masquée(s)') : '')
+         + '.<br>Une ligne est à vérifier quand la pièce est sous ' + Math.round(SURE_ITEM * 100)
+         + ' %, quand la couleur est sous ' + Math.round(SURE_COLOR * 100) + ' % sans être '
+         + 'déduite, quand l’inventaire l’a repêchée au-delà du rang ' + DEEP_RANK + ', ou '
+         + 'quand la découpe touche le bord. Le motif est écrit sur chacune.</div>';
+      if(sure){
+        h += '<div class="frow"><button class="fchip' + (CAT.all ? ' on' : '') + '" '
+           + 'data-cat-all="1">' + (CAT.all ? 'Masquer les sûres' : 'Montrer les ' + sure
+           + ' sûre(s)') + '</button></div>';
+      }
+      if(!shown.length){
+        h += '<div class="done">Tout est net — rien à vérifier sur cette photo.</div>';
+      }
+      shown.forEach(function(f){ h += catFindHtml(f); });
       h += '<div class="acts"><button class="act" data-cat-cancel="1">Annuler la photo</button>'
          + '<button class="act solid' + (npc ? '' : ' off') + '" data-cat-add="1">'
          + 'Ajouter au sac</button></div>';
@@ -3045,8 +3139,23 @@
     }
 
     if(CAT.stage === 'idle' && catPieces()){
-      h += '<div class="acts"><button class="act" data-cat-drop="1">Jeter la liste</button>'
-         + '<button class="act solid" data-cat-close="1">Fermer la liste</button></div>';
+      // La confirmation est DANS la page, pas dans une boîte du navigateur : celle-ci arrive
+      // en plein milieu de l'écran, se ferme par un bouton gris minuscule, et n'a rien à
+      // voir avec le reste de l'app. Deux boutons ici font le même travail sans déranger.
+      if(CAT.confirm === 'close'){
+        h += '<div class="rep warn">Fermer le sac ' + esc(CAT.bag) + ' avec ' + catPieces()
+           + ' pièce(s) ? Le PC écrit la liste et les sort de l’inventaire.</div>'
+           + '<div class="acts"><button class="act" data-cat-no="1">Non</button>'
+           + '<button class="act solid" data-cat-close="1">Oui, fermer</button></div>';
+      } else if(CAT.confirm === 'drop'){
+        h += '<div class="rep bad">Jeter la liste du sac ' + esc(CAT.bag) + ' ? Aucun fichier '
+           + 'n’a été touché, donc il n’y a rien à défaire — mais la saisie est perdue.</div>'
+           + '<div class="acts"><button class="act" data-cat-no="1">Non</button>'
+           + '<button class="act solid" data-cat-drop="1">Oui, jeter</button></div>';
+      } else {
+        h += '<div class="acts"><button class="act" data-cat-ask="drop">Jeter la liste</button>'
+           + '<button class="act solid" data-cat-ask="close">Fermer la liste</button></div>';
+      }
       if(CAT.saving) h += '<div class="rep">Enregistrement…</div>';
     }
     if(CAT.cmd){
@@ -3148,11 +3257,16 @@
       b.addEventListener('click', catAddFinds); });
     app.querySelectorAll('[data-cat-close]').forEach(function(b){
       b.addEventListener('click', catClose); });
+    app.querySelectorAll('[data-cat-ask]').forEach(function(b){
+      b.addEventListener('click', function(){
+        CAT.confirm = b.getAttribute('data-cat-ask'); render(); }); });
+    app.querySelectorAll('[data-cat-no]').forEach(function(b){
+      b.addEventListener('click', function(){ CAT.confirm = ''; render(); }); });
+    app.querySelectorAll('[data-cat-all]').forEach(function(b){
+      b.addEventListener('click', function(){ CAT.all = !CAT.all; render(); }); });
     app.querySelectorAll('[data-cat-drop]').forEach(function(b){
       b.addEventListener('click', function(){
-        if(!confirm('Jeter la liste du sac ' + CAT.bag + ' ? Aucun fichier n’a été '
-                  + 'touché — rien n’est encore inscrit.')) return;
-        CAT.lots = {}; CAT.photos = 0;
+        CAT.lots = {}; CAT.photos = 0; CAT.confirm = '';
         google.script.run.withSuccessHandler(function(){ render(); }).dropCatSession(CAT.number);
         render();
       }); });
