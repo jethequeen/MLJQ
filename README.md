@@ -1775,8 +1775,46 @@ set ferait une lecture Drive par set, à chaque fois.
 
 Les lots ne voyagent **pas** dans la commande, pour la même raison : `sort_commands.json` est
 relu à chaque rafraîchissement de la page, et deux cents lots dedans se paieraient à chaque
-fois. La commande ne porte que le nom du sac, et le PC refuse si ce n'est pas celui de la
-session ouverte.
+fois. La commande ne porte que le nom du sac.
+
+### Fermer une liste libère l'écran — et pourquoi ça a demandé une clé de plus
+
+L'écran restait figé sur le sac qu'on venait de fermer jusqu'à ce que le PC confirme, parce
+que le choix du sac suivant ne s'affiche que s'il n'y a aucune pièce en cours, et que les
+pièces n'étaient vidées qu'à la confirmation. Avec le poller à cinq minutes, c'était la pause
+la plus longue de la séance — devant une liste déjà fermée.
+
+**Ce qui dépend vraiment du PC, ce n'est pas la photo suivante, c'est de savoir ce que
+l'inventaire contient encore.** Et ça, le téléphone le sait : il retranche de l'inventaire
+publié les listes qu'il a soumises et qui ne sont pas encore inscrites. La reconnaissance du
+sac suivant reste donc juste sans rien attendre, et une liste en **erreur** rend ses pièces à
+l'inventaire disponible — rien n'a été écrit.
+
+Mais libérer l'écran a ouvert un trou qu'il a fallu boucher d'abord. `catsessions.json` était
+indexé **par set** : fermer 4-1 puis ouvrir 4-2 écrasait la liste de 4-1, et le PC refusait
+ensuite d'inscrire un sac dont il ne retrouvait plus la liste. Une heure de saisie perdue sans
+un mot. Les listes fermées vivent donc sous une clé à part, `_sent`, indexée par
+**set + sac** :
+
+```json
+{
+  "42226":  { "bag": "4 - 2", "lots": [ … ] },
+  "_sent": { "42226|4 - 1": { "bag": "4 - 1", "lots": [ … ], "id": "…" } }
+}
+```
+
+Trois détails qui tiennent l'ensemble :
+
+- **on met en file d'abord, on déplace ensuite.** Si le déplacement échoue, le PC ne trouve
+  rien sous `_sent` et retombe sur la liste ouverte, qui porte encore le bon sac : la demande
+  aboutit quand même. L'ordre inverse laisserait une liste en attente qu'aucune commande ne
+  viendrait jamais chercher ;
+- **la preuve qu'une liste est inscrite, c'est qu'elle a disparu de `_sent`** — le PC l'en
+  retire après avoir écrit. Le téléphone ne compare donc aucun identifiant de commande, ce
+  qui marche aussi quand deux listes attendent en même temps ;
+- **le succès part en toast, pas en pastille.** Le vert « sac 4-1 enregistré » restait
+  affiché pendant qu'on photographiait le 4-2, parce que rien ne l'effaçait. Ce qui reste à
+  l'écran, maintenant, c'est seulement ce qui attend encore.
 
 ### Le bouton « Ajouter un sac », et le nom qu'il propose
 

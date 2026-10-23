@@ -49,6 +49,10 @@ var BAG_HELP_FILE = 'restants_{set}.json';   // per-set, written by the PC at Ap
 // une heure de saisie ne se garde pas dans le navigateur, dont le sous-domaine tourne.
 var CATALOGUE_FILE = 'catalogue_{set}.json';
 var CAT_SESSIONS_FILE = 'catsessions.json';
+// Les listes FERMEES qui attendent encore leur inscription, rangees a part des listes
+// ouvertes dans le meme fichier. Cle interne et non un numero de set : un set n'a que des
+// chiffres pour nom. Meme valeur que photocat.SENT_KEY cote PC.
+var CAT_SENT_KEY = '_sent';
 var GLOBAL_ACTIONS = ['sync_purchases', 'buy_report', 'cfb_inventory', 'end_of_month',
                       'check_cookies'];
 // Portee ENVOI : ni un set (pas de dossier) ni un job global (il faut savoir lequel). Le
@@ -306,7 +310,14 @@ function getCatalogue(setNumber) {
                              + "que tant qu'il reste des pièces à cataloguer." };
   }
   data.ok = true;
-  data.session = (readJson_(CAT_SESSIONS_FILE) || {})[n] || null;
+  var all = readJson_(CAT_SESSIONS_FILE) || {};
+  data.session = all[n] || null;
+  // Les listes de CE set deja fermees mais pas encore inscrites : le telephone en retranche
+  // les quantites de l'inventaire publie, sinon il proposerait deux fois les memes pieces
+  // tant que le PC n'est pas passe.
+  var sent = all[CAT_SENT_KEY] || {}, mine = [];
+  for (var sk in sent) { if (sk.indexOf(n + '|') === 0) mine.push(sent[sk]); }
+  data.sent = mine;
   var cmds = (readJson_(COMMANDS_FILE) || { commands: [] }).commands || [];
   var last = null;
   cmds.forEach(function (c) {                          // chronologique → le dernier gagne
@@ -381,14 +392,47 @@ function dropCatSession(setNumber) {
  *  `catsessions.json`, et refuse si le sac ne correspond pas a celui de la session. */
 function closeCatBag(key, setNumber, bag) {
   var n = String(setNumber || '').trim();
-  var s = (readJson_(CAT_SESSIONS_FILE) || {})[n];
+  var b = catNorm_(bag);
+  var data = readJson_(CAT_SESSIONS_FILE) || {};
+  var s = data[n];
   if (!s || !(s.lots || []).length) {
     return { ok: false, error: 'aucune liste en cours pour ce set' };
   }
-  if (String(s.bag || '').trim() !== String(bag || '').trim()) {
+  if (catNorm_(s.bag) !== b) {
     return { ok: false, error: 'la liste ouverte est celle du sac ' + s.bag };
   }
-  return queueCommand(key, 'catalogue_bag', { bag: String(bag).trim(), set: n });
+  // ON MET EN FILE D'ABORD, on deplace ensuite. Si le deplacement echoue, le PC ne trouve
+  // rien sous « _sent » et retombe sur la liste ouverte, qui porte encore le bon sac : la
+  // demande aboutit quand meme. L'ordre inverse laisserait une liste en attente qu'aucune
+  // commande ne viendrait jamais chercher.
+  var r = queueCommand(key, 'catalogue_bag', { bag: b, set: n });
+  if (!r || !r.ok) return r;
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    data = readJson_(CAT_SESSIONS_FILE) || {};        // relu : le verrou vient d'etre pris
+    s = data[n];
+    if (s && catNorm_(s.bag) === b) {
+      var sent = data[CAT_SENT_KEY] || {};
+      s.id = r.id;
+      s.closed = new Date().toISOString().slice(0, 19);
+      sent[n + '|' + b] = s;
+      data[CAT_SENT_KEY] = sent;
+      delete data[n];                                  // l'ecran est libre pour le sac suivant
+      writeJson_(CAT_SESSIONS_FILE, data);
+    }
+  } finally {
+    try { lock.releaseLock(); } catch (x) {}
+  }
+  return r;
+}
+
+/** « 4-1 », « 4 - 1 » -> « 4 - 1 ». Meme forme que photocat.normalize_label cote PC, sans
+ *  quoi la cle de « _sent » ne serait pas celle que le PC cherchera. */
+function catNorm_(b) {
+  var m = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(String(b || ''));
+  if (!m) return String(b || '').trim();
+  return m[2] ? (Number(m[1]) + ' - ' + Number(m[2])) : String(Number(m[1]));
 }
 
 /** Persist the checked-off bag numbers for one set (writes the shared set_status.json). */

@@ -340,18 +340,27 @@ def _do_catalogue_bag(folder, payload):
     if not bag:
         raise RuntimeError("sac non précisé")
     set_no = set_number(folder)
-    lots = payload.get("lots")
+    lots, from_sent = payload.get("lots"), False
     if not lots:
-        session = photocat.read_session(set_no)
-        if not session:
-            raise RuntimeError("aucune session de cataloguage pour ce set — "
-                               "elle a peut-être déjà été inscrite")
-        s_bag = str(session.get("bag") or "").strip()
-        if s_bag and photocat.normalize_label(s_bag) != photocat.normalize_label(bag):
-            raise RuntimeError(f"la session ouverte est celle du sac {s_bag}, pas du {bag}")
+        # D'abord les listes FERMÉES qui attendent : fermer un sac ne bloque plus l'écran,
+        # donc le téléphone en a peut-être déjà ouvert un autre pour le même set. Chercher
+        # dans la liste ouverte en premier trouverait celle-là, et refuserait.
+        session = photocat.read_sent(set_no, bag)
+        from_sent = session is not None
+        if session is None:
+            session = photocat.read_session(set_no)
+            if not session:
+                raise RuntimeError("aucune liste de cataloguage pour ce sac — "
+                                   "elle a peut-être déjà été inscrite")
+            s_bag = str(session.get("bag") or "").strip()
+            if s_bag and photocat.normalize_label(s_bag) != photocat.normalize_label(bag):
+                raise RuntimeError(f"la liste ouverte est celle du sac {s_bag}, pas du {bag}")
         lots = session.get("lots") or []
     res = photocat.apply_session(folder, bag, lots)
-    photocat.clear_session(set_no)
+    if from_sent:
+        photocat.clear_sent(set_no, bag)
+    else:
+        photocat.clear_session(set_no)
     msg = f"sac {res['bag']} : {res['lots']} lots, {res['pieces']} pièces"
     if res["shorts"]:
         # Le téléphone ne laisse ajouter que ce que l'inventaire tient : si on arrive ici,

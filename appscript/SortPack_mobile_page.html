@@ -1915,26 +1915,28 @@
 
   var CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
              lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-             finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:'', bump:{}};
+             finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}};
 
   function openCat(key, bag){
     var s = SETS.filter(function(x){ return x.key === key; })[0];
     if(!s) return;
     CAT = {key:key, number:s.number, name:s.name, bag:String(bag || ''), data:null,
            loading:true, err:null, lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null,
-           boxes:[], overlay:'', finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:'', bump:{}};
+           boxes:[], overlay:'', finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}};
     render();
     google.script.run.withSuccessHandler(function(d){
       if(CAT.key !== key) return;
       CAT.loading = false;
       if(!d || !d.ok){ CAT.err = (d && d.error) || 'inventaire indisponible'; render(); return; }
       CAT.data = d;
-      // Une fermeture encore en vol reprend son attente : on a pu quitter la page entre le
-      // moment où on a fermé la liste et celui où le PC l'a inscrite. Une fermeture déjà
-      // terminée, elle, ne s'affiche pas — ce serait le succès d'un sac précédent.
-      if(d.cmd && (d.cmd.status === 'pending' || d.cmd.status === 'running')){
-        CAT.cmd = d.cmd; CAT.cmdId = d.cmd.id || ''; catPoll(0);
-      }
+      // Les listes fermées que le PC n'a pas encore inscrites reprennent leur attente : on
+      // a pu quitter la page entre la fermeture et l'écriture. Elles viennent du fichier
+      // partagé, donc elles survivent même à un téléphone rallumé.
+      CAT.sent = ((d.sent) || []).map(function(x){
+        return {id:x.id || '', bag:x.bag, lots:x.lots || [],
+                pieces:Number(x.pieces || 0), status:'pending', result:''};
+      });
+      if(CAT.sent.length) catPoll(0);
       // Une liste déjà ouverte reprend là où elle s'était arrêtée, et c'est SON sac qui
       // compte : le téléphone reposé au milieu d'un sac ne doit pas en recommencer un
       // autre sans le dire.
@@ -1955,7 +1957,7 @@
     if(CAT.shot && CAT.shot.bmp && CAT.shot.bmp.close) try{ CAT.shot.bmp.close(); }catch(e){}
     CAT = {key:null, number:'', name:'', bag:'', data:null, loading:false, err:null,
            lots:{}, photos:0, stage:'idle', busy:'', shot:null, work:null, boxes:[], overlay:'',
-           finds:[], open:null, q:'', cmd:null, cmdId:'', saving:false, all:false, confirm:'', bump:{}};
+           finds:[], open:null, q:'', sent:[], saving:false, all:false, confirm:'', bump:{}};
     render();
   }
 
@@ -1977,6 +1979,13 @@
       if(f.pick.lot.k === k) used += f.qty;
     });
     used += Math.max(0, CAT.bump['k:' + k] || 0);   // les quantités ajoutées à la main
+    // Et les listes DÉJÀ FERMÉES que le PC n'a pas encore inscrites : l'inventaire publié
+    // les contient toujours, donc sans ça on proposerait deux fois les mêmes pièces. Une
+    // liste en erreur, elle, n'a rien écrit : ses pièces sont bel et bien disponibles.
+    CAT.sent.forEach(function(x){
+      if(x.status === 'error') return;
+      (x.lots || []).forEach(function(lo){ if(lo.k === k) used += lo.qty; });
+    });
     return Math.max(0, Number(l.qty || 0) - used);
   }
 
@@ -2919,45 +2928,83 @@
     }).saveCatSession(CAT.number, CAT.bag, lots, CAT.photos);
   }
 
+  /** Fermer la liste LIBÈRE L'ÉCRAN tout de suite.
+   *
+   *  Avant, l'écran restait figé sur le sac fermé jusqu'à ce que le PC confirme — et le PC
+   *  passe toutes les minutes. On attendait devant une liste qu'on venait de fermer, sans
+   *  pouvoir en commencer une autre.
+   *
+   *  Ce qui dépend vraiment du PC, ce n'est pas la PHOTO suivante, c'est de savoir ce que
+   *  l'inventaire contient encore. Et ça, le téléphone le sait tout seul : il retranche de
+   *  l'inventaire publié les listes qu'il a soumises et qui ne sont pas encore inscrites
+   *  (`catAvail`). La reconnaissance du sac suivant reste donc juste, sans rien attendre.
+   */
   function catClose(){
     var pieces = catPieces();
     if(!pieces){ toast('La liste est vide'); return; }
     CAT.confirm = '';
     CAT.saving = true; render();
+    var bag = CAT.bag, lots = [];
+    for(var k in CAT.lots) lots.push(CAT.lots[k]);
     google.script.run.withSuccessHandler(function(r){
       CAT.saving = false;
       if(!r || !r.ok){ toast((r && r.error) || 'refusé'); render(); return; }
-      CAT.cmdId = r.id || '';
-      CAT.cmd = {id:CAT.cmdId, status:'pending', result:'', bag:CAT.bag};
+      CAT.sent.push({id:r.id || '', bag:bag, lots:lots, pieces:pieces, status:'pending',
+                     result:''});
+      CAT.lots = {}; CAT.photos = 0; CAT.bump = {}; CAT.open = null;
+      var ch = catBagChoices(CAT.data || {});
+      CAT.bag = ch.sub || ch.next;      // le sac suivant est déjà choisi, on peut photographier
       render();
+      toast('Sac ' + bag + ' fermé — tu peux enchaîner');
       catPoll(0);
     }).withFailureHandler(function(e){
       CAT.saving = false; toast('Erreur : ' + e.message); render();
-    }).closeCatBag(CAT.key, CAT.number, CAT.bag);
+    }).closeCatBag(CAT.key, CAT.number, bag);
   }
 
+  /** Suivre les listes soumises jusqu'à leur inscription.
+   *
+   *  La preuve qu'une liste est inscrite, c'est qu'elle a DISPARU de « _sent » : le PC l'en
+   *  retire lui-même après avoir écrit le .bsx. On ne compare donc aucun identifiant de
+   *  commande — ce qui marche aussi quand deux listes attendent en même temps. */
   var catTimer = null;
   function catPoll(tries){
     clearTimeout(catTimer);
-    if(tries > 20){          // ~3 min : le PC ne tourne probablement pas
-      CAT.cmd = {status:'error', result:'toujours en attente — le PC ne tourne peut-être pas.'};
+    if(!CAT.sent.length) return;
+    if(tries > 40){          // ~5 min : le PC ne tourne probablement pas
+      CAT.sent.forEach(function(x){
+        if(x.status === 'pending'){
+          x.status = 'late';
+          x.result = 'toujours en attente — le PC ne tourne peut-être pas';
+        }
+      });
       render(); return;
     }
     catTimer = setTimeout(function(){
       google.script.run.withSuccessHandler(function(d){
         if(!CAT.key) return;
-        var c = d && d.cmd;
-        if(c && c.id === CAT.cmdId && (c.status === 'done' || c.status === 'error')){
-          CAT.cmd = c;
-          if(c.status === 'done'){
-            // Le sac est écrit et l'inventaire décrémenté : la liste en cours n'existe plus,
-            // et l'instantané qu'on vient de relire est celui d'APRÈS.
-            CAT.lots = {}; CAT.photos = 0;
-            if(d.ok){ CAT.data = d; CAT.bag = (d.next_bags || ['1'])[0]; }
-            load(true);                    // la carte du set doit suivre (pastille, sacs)
+        var still = {};
+        ((d && d.sent) || []).forEach(function(x){ still[String(x.bag)] = true; });
+        var written = CAT.sent.filter(function(x){ return !still[String(x.bag)]; });
+        var cmd = d && d.cmd;
+        CAT.sent = CAT.sent.filter(function(x){ return still[String(x.bag)]; });
+        CAT.sent.forEach(function(x){
+          // Encore là ET la commande a échoué : rien n'a été écrit, ses pièces retournent
+          // donc dans l'inventaire disponible (voir `status` dans catAvail).
+          if(cmd && cmd.status === 'error' && String(cmd.bag) === String(x.bag)){
+            x.status = 'error'; x.result = cmd.result || 'refusé';
           }
-          render(); return;
+        });
+        if(written.length){
+          if(d && d.ok){ CAT.data = d; }
+          written.forEach(function(x){
+            toast('Sac ' + x.bag + ' inscrit'
+                  + (cmd && String(cmd.bag) === String(x.bag) && cmd.result
+                       ? ' — ' + cmd.result : ''));
+          });
+          load(true);                    // la carte du set doit suivre (pastille, sacs)
         }
+        render();
         catPoll(tries + 1);
       }).withFailureHandler(function(){ catPoll(tries + 1); }).getCatalogue(CAT.number);
     }, 8000);
@@ -3262,11 +3309,18 @@
       }
       if(CAT.saving) h += '<div class="rep">Enregistrement…</div>';
     }
-    if(CAT.cmd){
-      var ic = {pending:'⏳', running:'⚙', done:'✓', error:'⚠'}[CAT.cmd.status] || '';
-      h += '<div class="cmd ' + CAT.cmd.status + '">' + ic + ' Fermeture du sac '
-         + esc(CAT.cmd.bag || '') + ' — ' + esc(CAT.cmd.result || CAT.cmd.status) + '</div>';
-    }
+    // Les listes fermées en attente d'écriture. Discret et transitoire : le succès part en
+    // toast, il ne reste pas en vert par-dessus le sac suivant.
+    CAT.sent.forEach(function(x){
+      var cls = x.status === 'error' ? 'error' : (x.status === 'late' ? 'error' : 'pending');
+      var ic = x.status === 'error' ? '⚠' : (x.status === 'late' ? '⚠' : '⏳');
+      h += '<div class="cmd ' + cls + '">' + ic + ' Sac ' + esc(x.bag) + ' — '
+         + x.pieces + ' pièce(s) '
+         + esc(x.result || 'en attente du PC, il passe chaque minute')
+         + (x.status === 'error'
+              ? ' · rien n’a été écrit, rouvre l’écran pour la reprendre' : '')
+         + '</div>';
+    });
     h += '</div>';
 
     // Ce que la liste contient déjà, le dernier ajouté en premier.

@@ -260,8 +260,13 @@ def refresh_all(sets, log=None):
     return n
 
 
+# Les listes SOUMISES et pas encore inscrites vivent sous cette clé, à part des listes
+# ouvertes. Clé interne et non un numéro de set : un set s'appelle par des chiffres.
+SENT_KEY = "_sent"
+
+
 def read_sessions():
-    """Les listes ouvertes, {numéro de set: session}. Le téléphone les écrit."""
+    """Le fichier entier : {numéro de set: liste ouverte} + "_sent". Le téléphone l'écrit."""
     try:
         with open(sessions_path(), "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -270,23 +275,53 @@ def read_sessions():
         return {}
 
 
-def read_session(set_no):
-    return read_sessions().get(str(set_no))
-
-
-def clear_session(set_no):
-    """Oublier la session d'un set, les autres intactes. Relu juste avant d'écrire : le
-    téléphone peut avoir ajouté une photo à un AUTRE set entre-temps."""
-    data = read_sessions()
-    if str(set_no) not in data:
-        return False
-    del data[str(set_no)]
+def _write_sessions(data):
     try:
         with open(sessions_path(), "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=1)
         return True
     except OSError:
         return False
+
+
+def read_session(set_no):
+    """La liste OUVERTE d'un set — celle qu'on est en train de remplir."""
+    return read_sessions().get(str(set_no))
+
+
+def read_sent(set_no, bag):
+    """Une liste FERMÉE qui attend encore son inscription.
+
+    Elle est rangée à part de la liste ouverte, et c'est tout l'intérêt : fermer un sac ne
+    bloque plus l'écran, donc le téléphone en ouvre aussitôt un autre POUR LE MÊME SET. Les
+    deux étant jadis rangées sous la même clé, la nouvelle écrasait celle qui attendait, et
+    le PC refusait ensuite d'inscrire un sac dont il ne retrouvait plus la liste — une heure
+    de saisie perdue sans un mot.
+    """
+    sent = read_sessions().get(SENT_KEY) or {}
+    return sent.get("%s|%s" % (set_no, normalize_label(bag))) if bag else None
+
+
+def clear_sent(set_no, bag):
+    """Oublier une liste fermée une fois inscrite."""
+    data = read_sessions()
+    sent = data.get(SENT_KEY) or {}
+    k = "%s|%s" % (set_no, normalize_label(bag))
+    if k not in sent:
+        return False
+    del sent[k]
+    data[SENT_KEY] = sent
+    return _write_sessions(data)
+
+
+def clear_session(set_no):
+    """Oublier la liste ouverte d'un set, les autres intactes. Relu juste avant d'écrire : le
+    téléphone peut avoir ajouté une photo à un AUTRE set entre-temps."""
+    data = read_sessions()
+    if str(set_no) not in data:
+        return False
+    del data[str(set_no)]
+    return _write_sessions(data)
 
 
 class _BagLot(object):
